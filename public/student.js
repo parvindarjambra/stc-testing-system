@@ -74,7 +74,7 @@ function initStudent() {
     try {
       const d = await api('/api/students/lookup?roll=' + encodeURIComponent(roll), { noAuth: true });
       if (!d.found || !d.student) {
-        msg.textContent = 'Ye roll number list mein nahi hai — Admin se rabta karein.';
+        msg.textContent = 'Aapka Roll Number ghalat hai.';
         msg.className = 'lookup-msg err';
         return;
       }

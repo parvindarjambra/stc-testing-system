@@ -1,6 +1,6 @@
 # STC Testing System — Examination, Quiz & Result Management System
 
-**Version 1.4.2** — **Forgiving student CSV import + demo row in the template** (see §6): "Sir Ashok Kumar" now matches, unpadded "9:00 AM" shifts and lowercase courses ("cit" → "CIT") are accepted. **No fixed consolidation time** (v1.4.1): the 7:30 PM auto-consolidation is removed; Admin runs **Day Consolidation** any time — same evening or next morning — picking the date. **USB sync for offline labs** (v1.4.0): labs with no network at all get a standalone lab app (`STC-Lab.html`) — students test fully offline, and submissions come back on a USB stick for Admin to import (see §1c). Everything from v1.3.2 stays: the code lives on GitHub (https://github.com/parvindarjambra/stc-testing-system) with one-click updates (double-click `UPDATE.bat` on the Admin PC, no more ZIP downloads); laptops on the LAN need nothing installed — they just open the exam page in the browser (see §1b). Renamed to **STC Testing System**; the real STC logo in every header (local file, offline); a "Back to Home" button on every portal page; teacher CSV import; fill-in-the-blank questions (teacher-graded, like theory); Admin course-wise results export to Excel (CSV) + printable course-wise result sheets. See TEST_REPORT.md for the full v1.4.2 note.
+**Version 1.5.0** — **Modern redesign**: deep-navy sidebar console with brand block + icon tabs, pill badges for teachers/courses/shifts, refreshed landing hero and dark login screens — same flows, no feature changes. Wrong-roll message is now exactly 'Aapka Roll Number ghalat hai.' and the teacher button is 'Submit to Admin'. **Forgiving student CSV import** (v1.4.2, see §6): "Sir Ashok Kumar" now matches, unpadded "9:00 AM" shifts and lowercase courses ("cit" → "CIT") are accepted. **No fixed consolidation time** (v1.4.1): the 7:30 PM auto-consolidation is removed; Admin runs **Day Consolidation** any time — same evening or next morning — picking the date. **USB sync for offline labs** (v1.4.0): labs with no network at all get a standalone lab app (`STC-Lab.html`) — students test fully offline, and submissions come back on a USB stick for Admin to import (see §1c). Everything from v1.3.2 stays: the code lives on GitHub (https://github.com/parvindarjambra/stc-testing-system) with one-click updates (double-click `UPDATE.bat` on the Admin PC, no more ZIP downloads); laptops on the LAN need nothing installed — they just open the exam page in the browser (see §1b). Renamed to **STC Testing System**; the real STC logo in every header (local file, offline); a "Back to Home" button on every portal page; teacher CSV import; fill-in-the-blank questions (teacher-graded, like theory); Admin course-wise results export to Excel (CSV) + printable course-wise result sheets. See TEST_REPORT.md for the full v1.5.0 note.
 
 **Super Sys-Tech Computers Centre, Umerkot** (also known as Super City Computer Center)
 *"Empowering Skills Since 1997"*
@@ -171,8 +171,8 @@ moves only on a USB stick.
 
 Students do **not** log in — they just type their Roll Number on the Student Exam
 screen (`/student`). The roll number **must be in Admin's student list**
-(see §6): if it is not found, the student sees *"Ye roll number list mein nahi
-hai — Admin se rabta karein"* and cannot enter any test. If it is found, the
+(see §6): if it is not found, the student sees *"Aapka Roll Number ghalat
+hai."* and cannot enter any test. If it is found, the
 registered name, father's name, course, shift and assigned teacher are shown
 **read-only** (the student cannot change them) — the student confirms and picks
 a test. There is no manual-details entry: **import your real student lists
@@ -204,7 +204,7 @@ or demo data anywhere in the system.
 |---|---|
 | Before 7:00 AM | Admin starts the server (`START.bat`) and checks the dashboard. |
 | 7:00 AM – 7:00 PM | 11 one-hour shifts run (see below). Students open the Student Exam portal (`/student`), type their Roll Number (it must be on Admin's list), pick their test, and submit. After every submission the screen resets itself automatically, so the laptop is immediately ready for the next shift's student — no login conflicts. |
-| During the day | Teachers log in at `/teacher`, grade theory and fill-in-the-blank answers, and click **Generate Result & Send to Admin**. |
+| During the day | Teachers log in at `/teacher`, grade theory and fill-in-the-blank answers, and click **Submit to Admin**. |
 | Evening or next morning | Admin opens **Day Consolidation**, picks the date, and presses **Run Day Consolidation & Sync** — the system compiles the whole day's master record (all shifts, all laptops) and locks it. Running it again is safe, it never duplicates rows. The locked day sheet is then visible to Admin, Principal, and each teacher (their own students only). |
 | End of month | Admin opens **Monthly Report**, picks the month, reviews the compiled results, and exports/prints the Official Monthly Test & Progress Report. |
 
@@ -245,8 +245,8 @@ list cannot enter any test (see §2, §6).
 Each teacher sees **only** their own assigned students (enforced by the
 server). Side-by-side grading (student answer vs. model answer / suggested
 answer + max marks) for theory and fill-in-the-blank questions, per-question
-marks, auto-computed total, then **Generate Result &
-Send to Admin** (single or bulk for the day). Teachers can also view their own
+marks, auto-computed total, then **Submit to Admin**
+(single or bulk for the day). Teachers can also view their own
 Day Consolidation sheet.
 
 **Admin / Exam Controller Portal — `/admin` (login)**

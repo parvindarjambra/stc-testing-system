@@ -52,13 +52,13 @@ async function loadPrincipalMonth() {
     const pt = d.perTeacher || [];
     $('pm-teachers').innerHTML = pt.length
       ? '<table><tr><th>Teacher</th><th>Sent to Admin</th><th>Final</th><th>Pending</th></tr>' +
-        pt.map((x) => '<tr><td>' + esc(x.teacher_name) + '</td><td>' + x.sent_to_admin +
+        pt.map((x) => '<tr><td>' + pillTeacher(x.teacher_name) + '</td><td>' + x.sent_to_admin +
           '</td><td>' + x.final + '</td><td>' + x.pending + '</td></tr>').join('') + '</table>'
       : '<p class="muted">No teacher data for this month.</p>';
     const pc = d.perCourse || [];
     $('pm-courses').innerHTML = pc.length
       ? '<table><tr><th>Course</th><th>Students</th><th>Average %</th></tr>' +
-        pc.map((x) => '<tr><td>' + esc(x.course) + '</td><td>' + x.students +
+        pc.map((x) => '<tr><td>' + pillCourse(x.course) + '</td><td>' + x.students +
           '</td><td>' + x.avg_percentage + '%</td></tr>').join('') + '</table>'
       : '<p class="muted">No course data for this month.</p>';
   } catch (e) { toast('Month analytics failed: ' + e.message, false); }

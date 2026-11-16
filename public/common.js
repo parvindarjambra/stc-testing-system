@@ -11,6 +11,11 @@ const esc = (s) => String(s == null ? '' : s)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
+/* Pill badge helpers for table cells (teacher / course / shift). */
+function pillTeacher(name) { return name ? '<span class="pill pill-teacher">' + esc(name) + '</span>' : ''; }
+function pillCourse(name) { return name ? '<span class="pill pill-course">' + esc(name) + '</span>' : ''; }
+function pillShift(name) { return name ? '<span class="pill pill-shift">' + esc(name) + '</span>' : ''; }
+
 const todayISO = () => {
   const d = new Date();
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
@@ -161,11 +166,11 @@ function consolidationTable(rows) {
     '<th>Teacher</th><th>Test</th><th>MCQ</th><th>Theory / FIB</th><th>Total</th><th>Status</th></tr>';
   rows.forEach((r) => {
     html += '<tr><td>' + esc(r.roll_number) + '</td><td>' + esc(r.name) + '</td><td>' + esc(r.father_name) +
-      '</td><td>' + esc(r.course) + '</td><td>' + esc(r.shift) + '</td><td>' + esc(r.teacher_name) +
+      '</td><td>' + pillCourse(r.course) + '</td><td>' + pillShift(r.shift) + '</td><td>' + pillTeacher(r.teacher_name) +
       '</td><td>' + esc(r.test_title) + '</td><td>' + r.mcq_score + ' / ' + r.mcq_max +
       '</td><td>' + r.theory_marks_total + ' / ' + r.theory_max +
       '</td><td><strong>' + r.total + ' / ' + r.max_total + '</strong></td>' +
-      '<td>' + esc(String(r.status).replace(/_/g, ' ')) + '</td></tr>';
+      '<td><span class="status status-' + r.status + '">' + esc(String(r.status).replace(/_/g, ' ')) + '</span></td></tr>';
   });
   return html + '</table>';
 }
@@ -181,7 +186,7 @@ function shiftTable(perShift) {
   if (!perShift.length) return '<p class="muted">No submissions yet for this date.</p>';
   let html = '<table><tr><th>Shift</th><th>Submitted</th><th>Graded</th><th>Sent</th><th>Total</th></tr>';
   perShift.forEach((s) => {
-    html += '<tr><td>' + esc(s.shift) + '</td><td>' + s.submitted + '</td><td>' + s.graded +
+    html += '<tr><td>' + pillShift(s.shift) + '</td><td>' + s.submitted + '</td><td>' + s.graded +
       '</td><td>' + s.sent + '</td><td><strong>' + s.total + '</strong></td></tr>';
   });
   return html + '</table>';
@@ -189,14 +194,14 @@ function shiftTable(perShift) {
 function courseCountTable(perCourse) {
   if (!perCourse.length) return '<p class="muted">No submissions yet.</p>';
   let html = '<table><tr><th>Course</th><th>Submissions</th></tr>';
-  perCourse.forEach((c) => { html += '<tr><td>' + esc(c.course) + '</td><td>' + c.count + '</td></tr>'; });
+  perCourse.forEach((c) => { html += '<tr><td>' + pillCourse(c.course) + '</td><td>' + c.count + '</td></tr>'; });
   return html + '</table>';
 }
 function teacherDayTable(perTeacher) {
   if (!perTeacher.length) return '<p class="muted">No teacher activity yet.</p>';
   let html = '<table><tr><th>Teacher</th><th>Submitted</th><th>Graded</th><th>Sent</th><th>Final</th></tr>';
   perTeacher.forEach((t) => {
-    html += '<tr><td>' + esc(t.teacher_name) + '</td><td>' + t.submitted + '</td><td>' + t.graded +
+    html += '<tr><td>' + pillTeacher(t.teacher_name) + '</td><td>' + t.submitted + '</td><td>' + t.graded +
       '</td><td>' + t.sent + '</td><td>' + t.final + '</td></tr>';
   });
   return html + '</table>';
@@ -218,7 +223,7 @@ async function loadMonthlyReport(who) {
     rows.forEach((r) => {
       const tests = (r.tests || []).map((t) => esc(t.title) + ': ' + t.total + '/' + t.max).join('<br>');
       html += '<tr><td>' + esc(r.roll_number) + '</td><td>' + esc(r.name) + '</td><td>' + esc(r.father_name) +
-        '</td><td>' + esc(r.course) + '</td><td>' + esc(r.shift) + '</td><td>' + esc(r.teacher_name) +
+        '</td><td>' + pillCourse(r.course) + '</td><td>' + pillShift(r.shift) + '</td><td>' + pillTeacher(r.teacher_name) +
         '</td><td>' + tests + '</td><td><strong>' + r.total + ' / ' + r.max + '</strong></td>' +
         '<td>' + r.percentage + '%</td><td class="' + (r.result === 'Pass' ? 'pass' : 'fail') + '">' + r.result + '</td></tr>';
     });
@@ -333,6 +338,7 @@ async function restoreSession(role) {
 
 /* Show ONLY the login form (console hidden and emptied, no data visible). */
 function showPortalLogin() {
+  document.body.classList.add('login-mode');
   const c = $('view-console'); if (c) c.classList.add('hidden');
   const l = $('view-login'); if (l) l.classList.remove('hidden');
   const chip = $('user-chip'); if (chip) chip.textContent = '';
@@ -348,6 +354,7 @@ async function enterConsole(fragment, onReady) {
   if (res.status === 401) throw new Error('Session expired — please login again.');
   if (!res.ok) throw new Error('Could not load console (' + res.status + ')');
   $('console').innerHTML = await res.text();
+  document.body.classList.remove('login-mode');
   $('view-login').classList.add('hidden');
   $('view-console').classList.remove('hidden');
   $('user-chip').textContent = S.user.name + ' (' + S.user.role + ')';

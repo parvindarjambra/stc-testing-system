@@ -22,7 +22,7 @@ const crypto = require('crypto');
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = '0.0.0.0';
-const VERSION = '1.4.2';
+const VERSION = '1.5.0';
 const ROOT = __dirname;
 const DATA_DIR = path.join(ROOT, 'data');
 const PUBLIC_DIR = path.join(ROOT, 'public');

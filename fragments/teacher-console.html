@@ -4,8 +4,14 @@
 
 <div class="console-layout">
   <aside class="sidebar">
-    <button class="tab active" type="button" data-tpanel="queue">Grading Queue</button>
-    <button class="tab" type="button" data-tpanel="days">My Day Sheet</button>
+    <div class="sidebar-brand">
+      <div class="sidebar-logo"><img src="/stc-logo.webp" alt="STC logo"></div>
+      <div class="sidebar-brand-text"><strong>Teacher Console</strong><span>Super Sys-Tech Computers</span></div>
+    </div>
+    <div class="sidebar-tabs-scroll">
+    <button class="tab active" type="button" data-tpanel="queue"><span class="tab-icon" aria-hidden="true">📝</span>Grading Queue</button>
+    <button class="tab" type="button" data-tpanel="days"><span class="tab-icon" aria-hidden="true">📄</span>My Day Sheet</button>
+    </div>
   </aside>
   <div class="console-main">
     <div id="t-panel-queue">
@@ -37,7 +43,7 @@
       <p class="grade-total">Total: <strong id="grade-total-text">—</strong></p>
       <div class="btn-row">
         <button class="btn btn-primary" type="button" id="grade-save">Save Grades</button>
-        <button class="btn btn-emerald" type="button" id="grade-send">Generate Result &amp; Send to Admin</button>
+        <button class="btn btn-emerald" type="button" id="grade-send">Submit to Admin</button>
         <button class="btn" type="button" id="grade-close">Close</button>
       </div>
     </div>

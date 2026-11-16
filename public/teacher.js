@@ -30,8 +30,8 @@ async function loadTeacherQueue() {
     subs.forEach((s) => {
       html += '<tr class="clickable" data-grade="' + s.id + '">' +
         '<td>' + esc(s.student_roll) + '</td><td>' + esc(s.student_name) + '</td>' +
-        '<td>' + esc(s.father_name) + '</td><td>' + esc(s.course) + '</td>' +
-        '<td>' + esc(s.shift) + '</td><td>' + esc(s.test_title) + '</td>' +
+        '<td>' + esc(s.father_name) + '</td><td>' + pillCourse(s.course) + '</td>' +
+        '<td>' + pillShift(s.shift) + '</td><td>' + esc(s.test_title) + '</td>' +
         '<td>' + fmtDate(s.date) + '</td><td>' + s.mcq_score + ' / ' + s.mcq_max + '</td>' +
         '<td><span class="status status-' + s.status + '">' + esc(s.status.replace(/_/g, ' ')) + '</span></td>' +
         '<td><button class="btn btn-small" type="button">Open</button></td></tr>';

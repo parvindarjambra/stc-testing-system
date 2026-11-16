@@ -1,4 +1,4 @@
-// STC Testing System — end-to-end verification script (v1.4.2: real logo,
+// STC Testing System — end-to-end verification script (v1.5.0: real logo,
 // back-to-home, teacher import, fill-in-the-blank, course-wise results).
 // Usage: 1) wipe the test DB:  rm -f data/stc.sqlite data/*.json
 //        2) start server:      PORT=3102 node server.js   (auto-seeds users/courses on first start)
@@ -67,7 +67,7 @@ async function main() {
   const h = await req('GET', '/api/health');
   check('health 200 + ok', h.status === 200 && h.json && h.json.ok === true, JSON.stringify(h.json));
   check('db backend reported', h.json && (h.json.db === 'sqlite' || h.json.db === 'json'), h.json && h.json.db);
-  check('version is 1.4.2', h.json && h.json.version === '1.4.2', h.json && h.json.version);
+  check('version is 1.5.0', h.json && h.json.version === '1.5.0', h.json && h.json.version);
   const home = await req('GET', '/');
   check('landing page serves institute name', home.status === 200 && home.text.includes('Super Sys-Tech Computers Centre'));
   check('landing page serves Principal name', home.text.includes('Ramesh Kumar'));
@@ -465,7 +465,7 @@ async function main() {
   check('session cleared after submit (sessionStorage.clear)', stuSrc.includes('sessionStorage.clear'));
   check('exam state reset to blank start screen', stuSrc.includes('resetStudent'));
   check('strict roll error message present (Roman Urdu)',
-    stuSrc.includes('Ye roll number list mein nahi hai'));
+    stuSrc.includes('Aapka Roll Number ghalat hai.'));
   check('student page has NO manual-entry inputs (no stu-name/stu-course fields)',
     !stuHtml.includes('id="stu-name"') && !stuHtml.includes('id="stu-course"') && !stuHtml.includes('id="stu-teacher"'));
   check('student page has verify + read-only details flow',

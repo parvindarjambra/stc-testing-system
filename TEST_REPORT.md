@@ -491,3 +491,27 @@ canonical list ("cit" -> "CIT"). Genuinely wrong values still reject the row
 Tests: E2E 208 PASS, 0 FAIL (was 205; +3 new: forgiving import row, canonical
 values via lookup, template demo row); e2e-sync-test.js still 51 PASS,
 0 FAIL. Version bumped to 1.4.2.
+
+## v1.5.0 (2026-11-16) — Modern redesign
+User compared our design unfavourably with the other (Antigravity) system on
+his PC (dark navy sidebar, pill badges, gradient buttons) and ordered ours
+modern, EVEN BETTER. Restyle only — no functional changes, no new features:
+(1) style.css rewritten — deep-navy sidebar console with brand block (logo +
+console name) and icon tabs (active tab = emerald→teal gradient pill),
+rounded-2xl cards with soft layered shadows, modern tables (light uppercase
+headers, hover tint), pill badges for teachers (blue), courses (purple) and
+shifts (grey) in every table, refined buttons/inputs/toast/stats, refreshed
+landing hero + portal cards; (2) dark-navy login screens — the login card
+carries the real STC logo chip + "Staff & Faculty Portal" pill and a
+full-width gradient button (body.login-mode toggled by common.js);
+(3) sidebar tabs scroll horizontally on phone widths. Two wording changes
+from the user's 7-point spec: wrong-roll message is now exactly "Aapka Roll
+Number ghalat hai." (student.js + lab-template.html + README) and the teacher
+button is renamed "Submit to Admin" (id grade-send unchanged). All element
+ids/classes the JS depends on are unchanged; print sheets untouched.
+Tests: E2E 208 PASS, 0 FAIL; e2e-sync-test.js 51 PASS, 0 FAIL. Headless-
+Chromium visual check (CDP, real server): landing, admin login, admin
+console (Students + Dashboard), teacher queue, student page — desktop 1280
+and phone 390 — all render clean, no overlaps, zero page JS errors;
+wrong-roll message verified live. Screenshots: v150-*.png in the project
+folder (not shipped in the ZIP). Version bumped to 1.5.0.

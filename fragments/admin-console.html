@@ -4,15 +4,21 @@
 
 <div class="console-layout">
   <aside class="sidebar">
-    <button class="tab active" type="button" data-tab="dashboard">Dashboard</button>
-    <button class="tab" type="button" data-tab="students">Students</button>
-    <button class="tab" type="button" data-tab="tests">Tests</button>
-    <button class="tab" type="button" data-tab="results">Results</button>
-    <button class="tab" type="button" data-tab="monthly">Monthly Reports</button>
-    <button class="tab" type="button" data-tab="consolidation">Day Consolidation</button>
-    <button class="tab" type="button" data-tab="labsync">USB Lab Sync</button>
-    <button class="tab" type="button" data-tab="courses">Courses</button>
-    <button class="tab" type="button" data-tab="teachers">Teachers</button>
+    <div class="sidebar-brand">
+      <div class="sidebar-logo"><img src="/stc-logo.webp" alt="STC logo"></div>
+      <div class="sidebar-brand-text"><strong>Admin Console</strong><span>Super Sys-Tech Computers</span></div>
+    </div>
+    <div class="sidebar-tabs-scroll">
+    <button class="tab active" type="button" data-tab="dashboard"><span class="tab-icon" aria-hidden="true">📊</span>Dashboard</button>
+    <button class="tab" type="button" data-tab="students"><span class="tab-icon" aria-hidden="true">👥</span>Students</button>
+    <button class="tab" type="button" data-tab="tests"><span class="tab-icon" aria-hidden="true">📝</span>Tests</button>
+    <button class="tab" type="button" data-tab="results"><span class="tab-icon" aria-hidden="true">✅</span>Results</button>
+    <button class="tab" type="button" data-tab="monthly"><span class="tab-icon" aria-hidden="true">📅</span>Monthly Reports</button>
+    <button class="tab" type="button" data-tab="consolidation"><span class="tab-icon" aria-hidden="true">🗂️</span>Day Consolidation</button>
+    <button class="tab" type="button" data-tab="labsync"><span class="tab-icon" aria-hidden="true">💾</span>USB Lab Sync</button>
+    <button class="tab" type="button" data-tab="courses"><span class="tab-icon" aria-hidden="true">📚</span>Courses</button>
+    <button class="tab" type="button" data-tab="teachers"><span class="tab-icon" aria-hidden="true">👨‍🏫</span>Teachers</button>
+    </div>
   </aside>
   <div class="console-main">
     <!-- Dashboard -->

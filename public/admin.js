@@ -135,7 +135,7 @@ async function loadStudents() {
       '<th>Shift</th><th>Teacher</th><th></th></tr>';
     list.forEach((s) => {
       html += '<tr><td>' + esc(s.roll_number) + '</td><td>' + esc(s.name) + '</td><td>' + esc(s.father_name) +
-        '</td><td>' + esc(s.course) + '</td><td>' + esc(s.shift) + '</td><td>' + esc(s.teacher_name || '') +
+        '</td><td>' + pillCourse(s.course) + '</td><td>' + pillShift(s.shift) + '</td><td>' + pillTeacher(s.teacher_name || '') +
         '</td><td><button class="btn btn-small" type="button" data-st-edit="' + s.id + '">Edit</button> ' +
         '<button class="btn btn-small btn-danger" type="button" data-st-del="' + s.id + '">Delete</button></td></tr>';
     });
@@ -371,8 +371,8 @@ async function loadTests() {
     if (!tests.length) { box.innerHTML = '<p>No tests found.</p>'; return; }
     let html = '<table><tr><th>Title</th><th>Course</th><th>Type</th><th>Month</th><th>Duration</th><th>Questions</th><th></th></tr>';
     tests.forEach((t) => {
-      html += '<tr><td>' + esc(testLabel(t)) + '</td><td>' + esc(t.course) + '</td><td>' +
-        (t.type === 'monthly-test' ? 'Monthly Test' : 'Daily Quiz') + '</td><td>' +
+      html += '<tr><td>' + esc(testLabel(t)) + '</td><td>' + pillCourse(t.course) + '</td><td>' +
+        (t.type === 'monthly-test' ? '<span class="badge badge-monthly">Monthly Test</span>' : '<span class="badge badge-daily">Daily Quiz</span>') + '</td><td>' +
         (t.month ? monthName(t.month) : '—') + '</td><td>' + t.duration_minutes + ' min</td><td>' +
         t.question_count + '</td><td>' +
         '<button class="btn btn-small" type="button" data-test-edit="' + t.id + '">Edit</button> ' +
@@ -429,8 +429,8 @@ async function loadResultsReview() {
       '<th>MCQ</th><th>Theory / FIB</th><th>Total</th><th>Date</th><th></th></tr>';
     subs.forEach((s) => {
       const theory = Object.keys(s.theory_marks || {}).reduce((a, k) => a + (s.theory_marks[k] || 0), 0);
-      html += '<tr><td>' + esc(s.student_roll) + '</td><td>' + esc(s.student_name) + '</td><td>' + esc(s.course) +
-        '</td><td>' + esc(s.shift) + '</td><td>' + esc(s.test_title) + '</td><td>' + s.mcq_score + ' / ' + s.mcq_max +
+      html += '<tr><td>' + esc(s.student_roll) + '</td><td>' + esc(s.student_name) + '</td><td>' + pillCourse(s.course) +
+        '</td><td>' + pillShift(s.shift) + '</td><td>' + esc(s.test_title) + '</td><td>' + s.mcq_score + ' / ' + s.mcq_max +
         '</td><td>' + theory + ' / ' + s.theory_max + '</td><td><strong>' + s.total + ' / ' + s.max_total +
         '</strong></td><td>' + fmtDate(s.date) + '</td><td>' +
         '<button class="btn btn-small btn-emerald" type="button" data-finalize="' + s.id + '">Finalize</button></td></tr>';
@@ -508,7 +508,7 @@ async function loadTeachersAdmin() {
     let html = '<table><tr><th>Username</th><th>Name</th><th>Courses</th><th></th></tr>';
     list.forEach((u) => {
       html += '<tr><td>' + esc(u.username) + '</td><td>' + esc(u.name) + '</td><td>' +
-        esc((u.courses || []).join(', ')) + '</td><td>' +
+        (u.courses || []).map((c) => pillCourse(c)).join(' ') + '</td><td>' +
         '<button class="btn btn-small" type="button" data-user-edit="' + u.id + '">Edit</button> ' +
         '<button class="btn btn-small btn-danger" type="button" data-user-del="' + u.id + '">Delete</button></td></tr>';
     });
