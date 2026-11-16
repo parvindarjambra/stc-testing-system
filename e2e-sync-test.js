@@ -1,4 +1,4 @@
-// STC Testing System — USB-sync verification script (v1.7.0: offline labs).
+// STC Testing System — USB-sync verification script (v1.8.0: offline labs).
 // Tests the full offline-lab loop WITHOUT a browser:
 //   seed students + a monthly test via the Admin API -> export the lab pack
 //   (GET /api/lab-pack) -> build lab submissions EXACTLY in the format the
@@ -55,7 +55,7 @@ async function main() {
 
   console.log('\n[1] Health + admin login');
   const h = await req('GET', '/api/health');
-  check('health 200 + version 1.7.0', h.status === 200 && h.json && h.json.version === '1.7.0', h.json && h.json.version);
+  check('health 200 + version 1.8.0', h.status === 200 && h.json && h.json.version === '1.8.0', h.json && h.json.version);
   const admin = await login('admin', 'admin123', 'admin');
   check('admin login', !!(admin && admin.token));
   if (!admin) { console.log('FATAL: admin login failed'); process.exit(1); }
@@ -122,7 +122,7 @@ async function main() {
   //   submitted_at }, wrapped in the export envelope.
   const nowIso = new Date().toISOString();
   const envelope = {
-    format: 'stc-lab-submissions', version: '1.7.0', pack_id: packId,
+    format: 'stc-lab-submissions', version: '1.8.0', pack_id: packId,
     exported_at: nowIso,
     submissions: [
       {
@@ -132,6 +132,8 @@ async function main() {
           { q: 2, answer: 'H2O' }, { q: 3, answer: 'Plants make food using sunlight.' },
         ],
         submitted_at: nowIso,
+        // v1.8.0: LAB001 was auto-locked for tab-switching in the lab app.
+        tab_switches: 2, auto_locked: true,
       },
       {
         client_id: 'c-sync-002', student: { roll_number: 'LAB002' }, test_id: testId,
@@ -180,6 +182,12 @@ async function main() {
     check('student details rebuilt from register (name/course/shift)',
       sub1.student_name === 'Sync Student One' && sub1.course === 'DIT' && sub1.shift === SHIFT);
     check('answers stored as submitted', Array.isArray(sub1.answers) && sub1.answers.length === 4);
+    check('LAB001 keeps anti-cheat flags from the lab file (tab_switches 2, auto_locked true)',
+      sub1.tab_switches === 2 && sub1.auto_locked === true,
+      JSON.stringify({ t: sub1.tab_switches, l: sub1.auto_locked }));
+    check('LAB002 defaults tab_switches 0 + auto_locked false',
+      sub2.tab_switches === 0 && sub2.auto_locked === false,
+      JSON.stringify({ t: sub2.tab_switches, l: sub2.auto_locked }));
   }
 
   console.log('\n[6] Re-import dedupes (same USB file twice is safe)');

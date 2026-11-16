@@ -401,6 +401,27 @@ tr.clickable:hover td { background: #f0fdfa; }
 .qb-row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
 .qb-row label { flex: 1; min-width: 120px; }
 
+/* ---------- Blocking modal (v1.8.0: anti-cheat warning) ---------- */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(15, 23, 42, 0.72);
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.modal-card {
+  background: #fff; border-radius: 16px; padding: 28px;
+  max-width: 480px; width: 100%; text-align: center;
+  box-shadow: var(--shadow-pop);
+}
+.modal-card h3 { margin: 0 0 10px; color: #991B1B; font-size: 21px; }
+.modal-card p { margin: 0 0 20px; color: var(--navy2); font-size: 16px; line-height: 1.5; }
+
+/* ---------- Teacher grading flag (v1.8.0: tab-switch warning) ---------- */
+.grade-flag {
+  background: var(--red-soft); color: #991B1B; border: 1px solid #fca5a5;
+  border-radius: 12px; padding: 12px 14px;
+  font-size: 15px; font-weight: 700; margin: 12px 0;
+}
+
 /* ---------- Toast ---------- */
 .toast {
   max-width: 1160px; margin: 14px auto 0; padding: 13px 18px;

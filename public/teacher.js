@@ -55,6 +55,20 @@ async function openGrading(subId) {
     $('grade-meta').textContent = testLabel(test) + ' — ' + sub.course + ', ' + sub.shift +
       ' — MCQ ' + sub.mcq_score + ' / ' + sub.mcq_max + ' — Status: ' + sub.status +
       (sub.locked ? ' — LOCKED (consolidated, cannot change)' : '');
+    // Anti-cheat flag (v1.8.0): this banner IS the message to the teacher —
+    // the submission records how many times the student left the exam page
+    // and whether the test was auto-locked on the 2nd switch.
+    const flagEl = $('grade-flag');
+    const switches = sub.tab_switches || 0;
+    if (switches > 0) {
+      flagEl.textContent = '⚠️ This student left the exam page ' + switches +
+        ' time' + (switches === 1 ? '' : 's') + ' during the test.' +
+        (sub.auto_locked ? ' The test was auto-locked.' : '');
+      flagEl.classList.remove('hidden');
+    } else {
+      flagEl.classList.add('hidden');
+      flagEl.textContent = '';
+    }
     const answersByQ = {};
     (sub.answers || []).forEach((a) => { answersByQ[a.q] = a.answer; });
     // Theory AND fill-in-the-blank are both teacher-graded (MCQs are auto-graded).

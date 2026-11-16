@@ -17,6 +17,8 @@
 // v1.6.0: four-field student verification (name/father/course/roll).
 // v1.6.1: no credentials shown in the UI (demo hints removed from login pages).
 // v1.7.0: full-width staff consoles + inline validation errors + no student back/change.
+// v1.8.0: anti-cheat — tab-switch warning then auto-lock; the violation is
+// recorded on the submission (tab_switches / auto_locked) for the teacher.
 
 'use strict';
 
@@ -27,7 +29,7 @@ const crypto = require('crypto');
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = '0.0.0.0';
-const VERSION = '1.7.0';
+const VERSION = '1.8.0';
 const ROOT = __dirname;
 const DATA_DIR = path.join(ROOT, 'data');
 const PUBLIC_DIR = path.join(ROOT, 'public');
@@ -196,6 +198,15 @@ function todayStr(d) {
 }
 function nowIso() { return new Date().toISOString(); }
 function newId() { return crypto.randomUUID(); }
+
+// Anti-cheat flag (v1.8.0) sent with a submission: how many times the student
+// left the exam page (tab-hidden / window-blur). Sanitized to a non-negative
+// integer (capped at 99); anything else becomes 0. The lock flag is only
+// ever a real boolean (b.auto_locked === true at the call sites).
+function sanitizeTabSwitches(v) {
+  const n = parseInt(v, 10);
+  return Number.isFinite(n) && n > 0 ? Math.min(n, 99) : 0;
+}
 function isValidMonth(s) { return typeof s === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(s); }
 function isValidDate(s) { return typeof s === 'string' && /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(s); }
 
@@ -735,6 +746,7 @@ function createApp(store) {
         mcq_score: g.mcq_score, mcq_max: g.mcq_max, theory_marks: {}, theory_max: g.theory_max,
         total: g.mcq_score, max_total: g.max_total, status: 'submitted',
         submitted_at: nowIso(), graded_at: null, locked: 0,
+        tab_switches: sanitizeTabSwitches(b.tab_switches), auto_locked: b.auto_locked === true,
       });
       return sendJson(res, 201, { ok: true, submission: submissionSummary(sub) });
     }
@@ -915,6 +927,7 @@ function createApp(store) {
           mcq_score: g.mcq_score, mcq_max: g.mcq_max, theory_marks: {}, theory_max: g.theory_max,
           total: g.mcq_score, max_total: g.max_total, status: 'submitted',
           submitted_at: submittedAt, graded_at: null, locked: 0,
+          tab_switches: sanitizeTabSwitches(item.tab_switches), auto_locked: item.auto_locked === true,
         });
         imported++;
       }

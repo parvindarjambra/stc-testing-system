@@ -680,3 +680,61 @@ still work. Lab smoke of the real exported STC-Lab.html: 23/23 PASS.
 Screenshots: v170-console-desktop.png, v170-console-phone.png,
 v170-inline-error.png, v170-no-back-link.png, v170-lab-no-back-link.png
 in the project folder (not shipped in the ZIP). Version bumped to 1.7.0.
+
+## v1.8.0 (2026-11-16) — Anti-cheat: tab-switch warning, auto-lock, teacher flag
+
+Ordered by the user (09:02 PST): during the exam, if the student opens
+another site / switches away from the exam page — 1st time an automatic
+warning alert, 2nd time the test locks directly (auto-submit), and the
+teacher must be informed the student was changing sites.
+
+How it works: while an exam is active (after Start Exam, before submit —
+never on the verify/details/test-picker screens), the terminal listens for
+BOTH `document visibilitychange` (tab hidden) and `window blur` (window
+loses focus). Each counts as leaving the exam page. 1st switch: a blocking
+warning modal — 'Warning: Do not leave the exam page. If you switch again,
+your test will be locked.' — with a Continue button; the exam timer keeps
+running and the exam resumes on dismiss. 2nd switch: the test auto-submits
+immediately with the answers so far (existing submit flow) and a locked
+screen shows — 'Your test has been locked because you left the exam page.
+Your answers have been submitted.' — and the student cannot resume.
+One switch can fire BOTH visibilitychange and blur, so an "away" flag
+dedupes them: only the first event of an away episode counts, and
+returning (tab visible / window focus) clears it. Listeners are removed
+on submit, timeout and lock.
+
+The violation is recorded on the submission: `tab_switches` (count) and
+`auto_locked` (boolean) are stored by both the online submit endpoint and
+the lab-import endpoint (sanitized: the count is a non-negative integer
+capped at 99, the lock is a real boolean) and returned by the
+teacher-facing submission fetches. The teacher console shows a prominent
+red banner in the grading view for any submission with `tab_switches > 0`:
+'⚠️ This student left the exam page N time(s) during the test.' + 'The
+test was auto-locked.' when locked. That banner IS the message to the
+teacher — there is no live push; the teacher sees it on the student's
+result. The lab app (STC-Lab.html) has the identical detection + warning +
+lock client-side; the flags travel in the localStorage submission and the
+exported JSON, and the server preserves them at USB import.
+
+Honest scope note: detection sees tab-hidden + window-blur only — it
+cannot tell WHICH site or app the student opened, only that they left
+the exam page.
+
+Tests: E2E 252 PASS, 0 FAIL (was 237; +15 new checks in §24 — flagged
+submission stored, plain-submission defaults, forged-flag sanitization,
+teacher list fetch returns the flags, and code checks for the detection,
+modal, payload fields, teacher banner and lab mirror); e2e-sync-test.js
+53 PASS, 0 FAIL (was 51; +2 — lab-import preserves tab_switches /
+auto_locked, defaults on the unflagged submission).
+Headless-Chromium check (CDP, real server, 0 JS errors, 25/25 checks):
+no warning before the exam starts; warning modal live on the 1st switch
+(exact text, timer keeps running, dismiss resumes the exam); 2nd switch
+auto-submits + locked screen (exact text, exam gone); stored submission
+carries tab_switches 2 + auto_locked true with the answered MCQ still
+scored; teacher console shows the red banner (exact text) on that
+submission. Lab smoke of the real exported STC-Lab.html: 26/26 PASS
+(same warning + lock flow offline; exported JSON carries the flags; a
+real lab-import of the exported file preserves them server-side).
+Screenshots: v180-warning-modal.png, v180-locked-screen.png,
+v180-teacher-banner.png in the project folder (not shipped in the ZIP).
+Version bumped to 1.8.0.

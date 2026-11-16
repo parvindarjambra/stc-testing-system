@@ -1,5 +1,6 @@
-// STC Testing System — end-to-end verification script (v1.7.0: full-width
-// consoles, inline validation errors, no student back/change; no demo hints
+// STC Testing System — end-to-end verification script (v1.8.0: anti-cheat
+// tab-switch warning + auto-lock + teacher flag; full-width consoles,
+// inline validation errors, no student back/change; no demo hints
 // in the UI; four-field student verification, real logo, back-to-home,
 // teacher import, fill-in-the-blank, course-wise results).
 // Usage: 1) wipe the test DB:  rm -f data/stc.sqlite data/*.json
@@ -69,7 +70,7 @@ async function main() {
   const h = await req('GET', '/api/health');
   check('health 200 + ok', h.status === 200 && h.json && h.json.ok === true, JSON.stringify(h.json));
   check('db backend reported', h.json && (h.json.db === 'sqlite' || h.json.db === 'json'), h.json && h.json.db);
-  check('version is 1.7.0', h.json && h.json.version === '1.7.0', h.json && h.json.version);
+  check('version is 1.8.0', h.json && h.json.version === '1.8.0', h.json && h.json.version);
   const home = await req('GET', '/');
   check('home is the Student Terminal (institute name + verify form + heading)',
     home.status === 200 && home.text.includes('Super Sys-Tech Computers Centre') &&
@@ -753,6 +754,78 @@ async function main() {
     labSrc.includes('stu-confirm') && labSrc.includes('resetStudent') && labSrc.includes('submitExam'));
   check('dead .btn-link CSS removed (only used by the back link) (v1.7.0)',
     !css.text.includes('.btn-link'));
+
+  console.log('\n[24] v1.8.0 — anti-cheat: tab-switch warning, auto-lock, teacher flag');
+  // Live: a submission WITH anti-cheat flags stores them (online submit).
+  const acSub = await req('POST', '/api/submissions', {
+    client_id: 'e2e-ac1-' + Date.now(),
+    student: { roll_number: 'E2E-001' },
+    test_id: dit.id, answers, tab_switches: 2, auto_locked: true,
+  });
+  const ac1 = acSub.json && acSub.json.submission;
+  check('submit with tab_switches 2 + auto_locked true accepted',
+    (acSub.status === 200 || acSub.status === 201) && !!(ac1 && ac1.id), JSON.stringify(acSub.json));
+  const acStored = ac1 ? await req('GET', '/api/submissions/' + ac1.id, null, admin.token) : null;
+  const acS = acStored && acStored.json && acStored.json.submission;
+  check('flagged submission stores tab_switches 2 + auto_locked true',
+    !!(acS && acS.tab_switches === 2 && acS.auto_locked === true),
+    JSON.stringify(acS && { t: acS.tab_switches, l: acS.auto_locked }));
+  // Live: a submission WITHOUT flags defaults to 0 / false.
+  const plainSub = await req('POST', '/api/submissions', {
+    client_id: 'e2e-ac2-' + Date.now(),
+    student: { roll_number: 'E2E-001' },
+    test_id: dit.id, answers,
+  });
+  const pl1 = plainSub.json && plainSub.json.submission;
+  const plStored = pl1 ? await req('GET', '/api/submissions/' + pl1.id, null, admin.token) : null;
+  const plS = plStored && plStored.json && plStored.json.submission;
+  check('plain submission defaults tab_switches 0 + auto_locked false',
+    !!(plS && plS.tab_switches === 0 && plS.auto_locked === false),
+    JSON.stringify(plS && { t: plS.tab_switches, l: plS.auto_locked }));
+  // Live: forged flag values are sanitized (junk count -> 0, string lock -> false).
+  const junkSub = await req('POST', '/api/submissions', {
+    client_id: 'e2e-ac3-' + Date.now(),
+    student: { roll_number: 'E2E-001' },
+    test_id: dit.id, answers, tab_switches: 'junk', auto_locked: 'yes',
+  });
+  const jk1 = junkSub.json && junkSub.json.submission;
+  const jkStored = jk1 ? await req('GET', '/api/submissions/' + jk1.id, null, admin.token) : null;
+  const jkS = jkStored && jkStored.json && jkStored.json.submission;
+  check('forged flags sanitized (junk -> 0, "yes" -> false)',
+    !!(jkS && jkS.tab_switches === 0 && jkS.auto_locked === false),
+    JSON.stringify(jkS && { t: jkS.tab_switches, l: jkS.auto_locked }));
+  // Live: the teacher-facing list fetch returns the flags.
+  const kq2 = await req('GET', '/api/submissions', null, tokens.kelash.token);
+  const flagged = ((kq2.json && kq2.json.submissions) || []).find((s) => s.id === ac1.id);
+  check('teacher queue fetch returns the flag fields',
+    !!(flagged && flagged.tab_switches === 2 && flagged.auto_locked === true));
+  // Code: online terminal detection + warning + lock.
+  check('student.js listens to visibilitychange + blur during the exam (v1.8.0)',
+    stuSrc.includes("addEventListener('visibilitychange'") && stuSrc.includes("addEventListener('blur'"));
+  check('student.js warns on 1st switch, locks + auto-submits on 2nd (v1.8.0)',
+    stuSrc.includes('ac-modal') &&
+    stuSrc.includes('Your test has been locked because you left the exam page') &&
+    stuSrc.includes('lockExam') && stuSrc.includes('startAntiCheat'));
+  check('student modal carries the exact warning text (v1.8.0)',
+    stuHtml.includes('Warning: Do not leave the exam page. If you switch again, your test will be locked.'));
+  check('student payload carries tab_switches + auto_locked (v1.8.0)',
+    stuSrc.includes('tab_switches: S.tabSwitches') && stuSrc.includes('auto_locked: S.examLocked'));
+  check('student modal markup present (ac-modal + Continue button) (v1.8.0)',
+    stuHtml.includes('id="ac-modal"') && stuHtml.includes('id="ac-continue"'));
+  check('modal + grade-flag styles present (v1.8.0)',
+    css.text.includes('.modal-overlay') && css.text.includes('.modal-card') && css.text.includes('.grade-flag'));
+  // Code: teacher banner.
+  check('teacher fragment has the grade-flag slot (v1.8.0)',
+    teaFrag.includes('grade-flag'));
+  check('teacher.js shows the tab-switch banner in the grading view (v1.8.0)',
+    teaJs13.includes('grade-flag') && teaJs13.includes('left the exam page') && teaJs13.includes('auto-locked'));
+  // Code: lab app mirrors the online flow.
+  check('lab app has the same detection + warning + lock (v1.8.0)',
+    labSrc.includes("addEventListener('visibilitychange'") && labSrc.includes("addEventListener('blur'") &&
+    labSrc.includes('If you switch again, your test will be locked') &&
+    labSrc.includes('Your test has been locked because you left the exam page'));
+  check('lab payload carries tab_switches + auto_locked (v1.8.0)',
+    labSrc.includes('tab_switches: S.tabSwitches') && labSrc.includes('auto_locked: S.examLocked'));
 
   console.log('\n========================================');
   console.log('E2E RESULT: ' + pass + ' PASS, ' + fail + ' FAIL');

@@ -99,7 +99,7 @@
 
     <!-- Step 4: result summary -->
     <div id="stu-result" class="card narrow hidden">
-      <h2>Result Summary</h2>
+      <h2 id="stu-result-title">Result Summary</h2>
       <div id="stu-result-body"></div>
       <p class="muted">Your session has been cleared. The next student can start fresh.</p>
       <button class="btn btn-primary" type="button" id="stu-result-done">Start Next Student</button>
@@ -110,6 +110,17 @@
 <footer class="terminal-footer"><span id="terminal-version">STC Testing System</span> &nbsp;|&nbsp; Umerkot, Sindh &nbsp;|&nbsp; Works offline on the centre LAN</footer>
 
 <div id="print-area"></div>
+
+<!-- Anti-cheat warning (v1.8.0): blocking modal shown the FIRST time the
+     student leaves the exam page during an exam. The exam timer keeps
+     running while it is up; a second switch locks the test instead. -->
+<div id="ac-modal" class="modal-overlay hidden" role="alertdialog" aria-modal="true" aria-labelledby="ac-modal-title">
+  <div class="modal-card">
+    <h3 id="ac-modal-title">⚠️ Warning</h3>
+    <p>Warning: Do not leave the exam page. If you switch again, your test will be locked.</p>
+    <button class="btn btn-primary btn-big" type="button" id="ac-continue">Continue Exam</button>
+  </div>
+</div>
 
 <script src="common.js"></script>
 <script src="student.js"></script>

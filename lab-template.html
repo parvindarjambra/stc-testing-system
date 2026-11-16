@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- =====================================================================
-     STC Testing System — Offline Lab App (USB sync, v1.7.0).
+     STC Testing System — Offline Lab App (USB sync, v1.8.0).
      Super Sys-Tech Computers Centre, Umerkot.
 
      SELF-CONTAINED: inline CSS + inline JS, ZERO external references,
@@ -85,6 +85,11 @@ th { color: #475569; font-weight: 600; width: 38%; }
 .opt input { margin-right: 8px; }
 .exam-actions { margin-top: 16px; }
 .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #0f172a; color: #fff; padding: 12px 20px; border-radius: 10px; font-size: 14px; z-index: 50; max-width: 90vw; text-align: center; }
+/* Blocking modal (v1.8.0: anti-cheat warning). */
+.modal-overlay { position: fixed; inset: 0; z-index: 100; background: rgba(15, 23, 42, 0.72); display: flex; align-items: center; justify-content: center; padding: 20px; }
+.modal-card { background: #fff; border-radius: 16px; padding: 28px; max-width: 480px; width: 100%; text-align: center; box-shadow: 0 10px 30px rgba(15, 23, 42, 0.3); }
+.modal-card h3 { margin: 0 0 10px; color: #991B1B; font-size: 21px; }
+.modal-card p { margin: 0 0 20px; color: #1e293b; font-size: 16px; line-height: 1.5; }
 .toast.ok { background: #047857; }
 .toast.err { background: #b91c1c; }
 .login-badge { font-size: 34px; }
@@ -177,13 +182,24 @@ th { color: #475569; font-weight: 600; width: 38%; }
 
   <!-- Step 4: saved confirmation (no scores — grading happens on the Admin PC after USB import) -->
   <div id="stu-result" class="card narrow hidden">
-    <h2>Answers Saved</h2>
+    <h2 id="stu-result-title">Answers Saved</h2>
     <div id="stu-result-body"></div>
     <p class="muted">Your session has been cleared. The next student can start fresh.</p>
     <button class="btn btn-primary" type="button" id="stu-result-done">Start Next Student</button>
   </div>
 
 </main>
+
+<!-- Anti-cheat warning (v1.8.0): blocking modal shown the FIRST time the
+     student leaves the exam page during an exam. The exam timer keeps
+     running while it is up; a second switch locks the test instead. -->
+<div id="ac-modal" class="modal-overlay hidden" role="alertdialog" aria-modal="true" aria-labelledby="ac-modal-title">
+  <div class="modal-card">
+    <h3 id="ac-modal-title">⚠️ Warning</h3>
+    <p>Warning: Do not leave the exam page. If you switch again, your test will be locked.</p>
+    <button class="btn btn-primary btn-big" type="button" id="ac-continue">Continue Exam</button>
+  </div>
+</div>
 
 <script>
 'use strict';
@@ -222,7 +238,12 @@ function toast(msg, ok) {
 }
 
 /* ---------------- state ---------------- */
-var S = { student: null, test: null, answers: {}, timerId: null, endsAt: 0, currentQ: 0 };
+/* Anti-cheat (v1.8.0): tabSwitches counts how many times the student left
+   the exam page; examLocked is set on the 2nd switch (auto-submit); away
+   dedupes the visibilitychange + blur pair one switch can fire, and is
+   cleared when the student returns. */
+var S = { student: null, test: null, answers: {}, timerId: null, endsAt: 0, currentQ: 0,
+  tabSwitches: 0, examLocked: false, antiCheatOn: false, away: false };
 
 /* ---------------- saved submissions (localStorage) ---------------- */
 var SUBS_KEY = 'stc_lab_submissions_v1';
@@ -315,6 +336,7 @@ function initLab() {
      -> exam -> submit -> reset for the next student). Details come from
      Admin's list and cannot be changed at the terminal. */
   $('exam-submit').addEventListener('click', function () { submitExam(false); });
+  $('ac-continue').addEventListener('click', hideAcWarning);
   $('stu-result-done').addEventListener('click', resetStudent);
   $('btn-export').addEventListener('click', exportSubmissions);
   $('btn-clear').addEventListener('click', clearSaved);
@@ -364,6 +386,7 @@ function startExam(testId) {
   renderQuestions();
   renderPalette();
   startTimer(test.duration_minutes * 60);
+  startAntiCheat();
   window.scrollTo(0, 0);
 }
 
@@ -473,6 +496,58 @@ function stopTimer() {
   if (S.timerId) { clearInterval(S.timerId); S.timerId = null; }
 }
 
+/* Anti-cheat (v1.8.0): same rules as the online terminal — while an exam
+   is active, leaving the exam page (tab hidden OR window loses focus) is
+   counted. 1st switch: a blocking warning modal (the exam timer keeps
+   running). 2nd switch: the test locks and auto-submits with the answers
+   so far. Listeners run ONLY during an exam. One switch can fire BOTH
+   visibilitychange and blur, so S.away dedupes them: only the first
+   event of an "away" episode counts, and returning (tab visible again /
+   window focus) clears it. Detection sees only THAT the student left
+   the page — never WHICH site or app they opened. */
+function startAntiCheat() {
+  stopAntiCheat();
+  S.tabSwitches = 0;
+  S.examLocked = false;
+  S.away = false;
+  S.antiCheatOn = true;
+  document.addEventListener('visibilitychange', onExamVisibility);
+  window.addEventListener('blur', onExamBlur);
+  window.addEventListener('focus', onExamReturn);
+}
+function stopAntiCheat() {
+  S.antiCheatOn = false;
+  document.removeEventListener('visibilitychange', onExamVisibility);
+  window.removeEventListener('blur', onExamBlur);
+  window.removeEventListener('focus', onExamReturn);
+}
+function onExamVisibility() {
+  if (document.hidden) onExamLeave();
+  else onExamReturn();
+}
+function onExamBlur() { onExamLeave(); }
+function onExamReturn() { S.away = false; }
+function onExamLeave() {
+  if (!S.antiCheatOn || S.examLocked || S.away || !S.test) return;
+  S.away = true;
+  S.tabSwitches++;
+  if (S.tabSwitches === 1) {
+    $('ac-modal').classList.remove('hidden');
+    $('ac-continue').focus();
+  } else {
+    lockExam();
+  }
+}
+function hideAcWarning() {
+  $('ac-modal').classList.add('hidden');
+}
+function lockExam() {
+  if (S.examLocked || !S.test) return;
+  S.examLocked = true;
+  hideAcWarning();
+  submitExam(true);   /* auto-submit with the answers so far, no confirm */
+}
+
 /* Submission payload — the SAME shape the online portal sends to
    POST /api/submissions, plus submitted_at (the import uses it for the
    submission date, so a test taken on Monday counts on Monday even if
@@ -487,7 +562,11 @@ function buildSubmissionPayload() {
     student: { roll_number: S.student.roll_number },
     test_id: S.test.id,
     answers: answers,
-    submitted_at: new Date().toISOString()
+    submitted_at: new Date().toISOString(),
+    /* Anti-cheat (v1.8.0): recorded on the submission for the teacher
+       (the server preserves these fields at USB import time). */
+    tab_switches: S.tabSwitches,
+    auto_locked: S.examLocked
   };
 }
 
@@ -495,17 +574,39 @@ function submitExam(auto) {
   if (!S.test) return;
   if (!auto && !confirm('Submit your answers now? You cannot change them after submit.')) return;
   stopTimer();
+  stopAntiCheat();
+  hideAcWarning();
   $('exam-submit').disabled = true;
   var payload = buildSubmissionPayload();
   var saved = getSaved();
   saved.push(payload);
   setSaved(saved);
-  showSaved();
+  if (S.examLocked) showLockedScreen();
+  else showSaved();
+}
+
+/* Locked screen (v1.8.0): shown after an auto-lock auto-submit. Same
+   immediate session clear as the normal saved screen. */
+function showLockedScreen() {
+  hideAcWarning();
+  $('stu-exam').classList.add('hidden');
+  $('stu-result').classList.remove('hidden');
+  $('stu-result-title').textContent = 'Test Locked';
+  $('stu-result-body').innerHTML =
+    '<p><strong>Your test has been locked because you left the exam page. Your answers have been submitted.</strong></p>' +
+    '<table><tr><th>Test</th><td>' + esc(testLabel(S.test)) + '</td></tr>' +
+    '<tr><th>Student</th><td>' + esc(S.student.name) + ' (' + esc(S.student.roll_number) + ')</td></tr>' +
+    '<tr><th>Times left the exam page</th><td><strong>' + S.tabSwitches + '</strong></td></tr></table>' +
+    '<p class="muted">Your teacher will see this after it reaches the Admin PC (USB import).</p>';
+  /* Clear the session immediately so the next student starts blank. */
+  S.test = null; S.answers = {}; S.student = null;
+  S.tabSwitches = 0; S.examLocked = false; S.away = false;
 }
 
 /* Saved confirmation — NO scores are shown here: MCQ auto-grading happens
    on the Admin PC at USB import time (the answer keys never leave it). */
 function showSaved() {
+  hideAcWarning();
   $('stu-exam').classList.add('hidden');
   $('stu-result').classList.remove('hidden');
   $('stu-result-body').innerHTML =
@@ -516,9 +617,12 @@ function showSaved() {
     'MCQ marks are counted automatically there; theory and fill-in-the-blank answers are marked by your teacher.</p>';
   // Clear the session immediately so the next student starts blank.
   S.test = null; S.answers = {}; S.student = null;
+  S.tabSwitches = 0; S.examLocked = false; S.away = false;
 }
 
 function resetStudent() {
+  hideAcWarning();
+  $('stu-result-title').textContent = 'Answers Saved';
   $('stu-result').classList.add('hidden');
   $('stu-tests').classList.add('hidden');
   $('stu-exam').classList.add('hidden');
@@ -547,7 +651,7 @@ function exportSubmissions() {
     '-' + pad(now.getHours()) + pad(now.getMinutes());
   var envelope = {
     format: 'stc-lab-submissions',
-    version: '1.7.0',
+    version: '1.8.0',
     pack_id: (LAB_PACK && LAB_PACK.pack_id) || null,
     exported_at: now.toISOString(),
     submissions: saved

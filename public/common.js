@@ -76,6 +76,11 @@ const S = {
   test: null,                                       // full test object for the exam
   answers: {},                                      // qIndex -> answer (MCQ: option index, Theory: text)
   timerId: null, endsAt: 0, currentQ: 0,
+  // Anti-cheat (v1.8.0, exam screen only): tabSwitches counts how many
+  // times the student left the exam page; examLocked is set on the 2nd
+  // switch (auto-submit); away dedupes the visibilitychange + blur pair
+  // that one switch can fire, and is cleared when the student returns.
+  tabSwitches: 0, examLocked: false, antiCheatOn: false, away: false,
   grading: null,                                    // { submission, test }
   editingCourseId: null, editingStudentId: null, editingUserId: null,
   editingTestId: null, builderQuestions: [],

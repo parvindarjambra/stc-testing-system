@@ -124,6 +124,7 @@ function initStudent() {
   // Admin's list and cannot be changed at the terminal.
 
   $('exam-submit').addEventListener('click', () => submitExam(false));
+  $('ac-continue').addEventListener('click', hideAcWarning);
   $('stu-result-done').addEventListener('click', resetStudent);
 }
 
@@ -176,6 +177,7 @@ async function startExam(testId) {
     renderQuestions();
     renderPalette();
     startTimer(test.duration_minutes * 60);
+    startAntiCheat();
     window.scrollTo(0, 0);
   } catch (e) { toast('Could not start exam: ' + e.message, false); }
 }
@@ -288,6 +290,58 @@ function stopTimer() {
   if (S.timerId) { clearInterval(S.timerId); S.timerId = null; }
 }
 
+/* Anti-cheat (v1.8.0): while an exam is active, leaving the exam page
+   (tab hidden OR window loses focus) is counted. 1st switch: a blocking
+   warning modal (the exam timer keeps running). 2nd switch: the test
+   locks and auto-submits with the answers so far. Listeners run ONLY
+   during an exam — never on the verify/details/test-picker screens.
+   One switch can fire BOTH visibilitychange and blur, so S.away dedupes
+   them: only the first event of an "away" episode counts, and returning
+   (tab visible again / window focus) clears it. Detection sees only
+   THAT the student left the page — never WHICH site or app they opened. */
+function startAntiCheat() {
+  stopAntiCheat();
+  S.tabSwitches = 0;
+  S.examLocked = false;
+  S.away = false;
+  S.antiCheatOn = true;
+  document.addEventListener('visibilitychange', onExamVisibility);
+  window.addEventListener('blur', onExamBlur);
+  window.addEventListener('focus', onExamReturn);
+}
+function stopAntiCheat() {
+  S.antiCheatOn = false;
+  document.removeEventListener('visibilitychange', onExamVisibility);
+  window.removeEventListener('blur', onExamBlur);
+  window.removeEventListener('focus', onExamReturn);
+}
+function onExamVisibility() {
+  if (document.hidden) onExamLeave();
+  else onExamReturn();
+}
+function onExamBlur() { onExamLeave(); }
+function onExamReturn() { S.away = false; }
+function onExamLeave() {
+  if (!S.antiCheatOn || S.examLocked || S.away || !S.test) return;
+  S.away = true;
+  S.tabSwitches++;
+  if (S.tabSwitches === 1) {
+    $('ac-modal').classList.remove('hidden');
+    $('ac-continue').focus();
+  } else {
+    lockExam();
+  }
+}
+function hideAcWarning() {
+  $('ac-modal').classList.add('hidden');
+}
+function lockExam() {
+  if (S.examLocked || !S.test) return;
+  S.examLocked = true;
+  hideAcWarning();
+  submitExam(true);   // auto-submit with the answers so far, no confirm
+}
+
 function buildSubmissionPayload() {
   const answers = S.test.questions.map((q, i) => ({
     q: i,
@@ -297,7 +351,10 @@ function buildSubmissionPayload() {
     client_id: 'c-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
     student: S.student,
     test_id: S.test.id,
-    answers: answers
+    answers: answers,
+    // Anti-cheat (v1.8.0): recorded on the submission for the teacher.
+    tab_switches: S.tabSwitches,
+    auto_locked: S.examLocked
   };
 }
 
@@ -305,6 +362,8 @@ async function submitExam(auto) {
   if (!S.test) return;
   if (!auto && !confirm('Submit your answers now? You cannot change them after submit.')) return;
   stopTimer();
+  stopAntiCheat();
+  hideAcWarning();
   $('exam-submit').disabled = true;
   const payload = buildSubmissionPayload();
   try {
@@ -315,18 +374,41 @@ async function submitExam(auto) {
     });
     const d = await res.json().catch(() => null);
     if (!res.ok || !d || !d.ok) throw new Error((d && d.error) || ('Submit failed (' + res.status + ')'));
-    showResult(d.submission, false);
+    if (S.examLocked) showLockedScreen(false);
+    else showResult(d.submission, false);
   } catch (e) {
     // Offline (or server unreachable): queue it and sync later.
     const q = getQueue();
     q.push(payload);
     setQueue(q);
-    showResult(null, true);
+    if (S.examLocked) showLockedScreen(true);
+    else showResult(null, true);
   }
+}
+
+/* Locked screen (v1.8.0): shown after an auto-lock auto-submit. Same
+   immediate session clear as the normal result screen. */
+function showLockedScreen(offline) {
+  hideAcWarning();
+  $('stu-exam').classList.add('hidden');
+  $('stu-result').classList.remove('hidden');
+  $('stu-result-title').textContent = 'Test Locked';
+  $('stu-result-body').innerHTML =
+    '<p><strong>Your test has been locked because you left the exam page. Your answers have been submitted.</strong></p>' +
+    '<table><tr><th>Test</th><td>' + esc(testLabel(S.test)) + '</td></tr>' +
+    '<tr><th>Student</th><td>' + esc(S.student.name) + ' (' + esc(S.student.roll_number) + ')</td></tr>' +
+    '<tr><th>Times left the exam page</th><td><strong>' + S.tabSwitches + '</strong></td></tr></table>' +
+    (offline ? '<p class="muted">Saved offline — will sync automatically.</p>' : '');
+  // Clear the session immediately so the next student starts blank.
+  sessionStorage.clear();
+  S.token = null; S.user = null;
+  S.test = null; S.answers = {}; S.student = null;
+  S.tabSwitches = 0; S.examLocked = false; S.away = false;
 }
 
 /* Result summary, then IMMEDIATE session clear per contract. */
 function showResult(sub, offline) {
+  hideAcWarning();
   $('stu-exam').classList.add('hidden');
   $('stu-result').classList.remove('hidden');
   const body = $('stu-result-body');
@@ -348,9 +430,12 @@ function showResult(sub, offline) {
   sessionStorage.clear();
   S.token = null; S.user = null;
   S.test = null; S.answers = {}; S.student = null;
+  S.tabSwitches = 0; S.examLocked = false; S.away = false;
 }
 
 function resetStudent() {
+  hideAcWarning();
+  $('stu-result-title').textContent = 'Result Summary';
   $('stu-result').classList.add('hidden');
   $('stu-tests').classList.add('hidden');
   $('stu-exam').classList.add('hidden');
