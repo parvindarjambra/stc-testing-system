@@ -1,4 +1,4 @@
-// STC Testing System — USB-sync verification script (v1.6.0: offline labs).
+// STC Testing System — USB-sync verification script (v1.6.1: offline labs).
 // Tests the full offline-lab loop WITHOUT a browser:
 //   seed students + a monthly test via the Admin API -> export the lab pack
 //   (GET /api/lab-pack) -> build lab submissions EXACTLY in the format the
@@ -55,7 +55,7 @@ async function main() {
 
   console.log('\n[1] Health + admin login');
   const h = await req('GET', '/api/health');
-  check('health 200 + version 1.6.0', h.status === 200 && h.json && h.json.version === '1.6.0', h.json && h.json.version);
+  check('health 200 + version 1.6.1', h.status === 200 && h.json && h.json.version === '1.6.1', h.json && h.json.version);
   const admin = await login('admin', 'admin123', 'admin');
   check('admin login', !!(admin && admin.token));
   if (!admin) { console.log('FATAL: admin login failed'); process.exit(1); }
@@ -122,7 +122,7 @@ async function main() {
   //   submitted_at }, wrapped in the export envelope.
   const nowIso = new Date().toISOString();
   const envelope = {
-    format: 'stc-lab-submissions', version: '1.6.0', pack_id: packId,
+    format: 'stc-lab-submissions', version: '1.6.1', pack_id: packId,
     exported_at: nowIso,
     submissions: [
       {
@@ -193,7 +193,7 @@ async function main() {
 
   console.log('\n[7] Bad import rows are rejected with clear errors');
   const bad = await req('POST', '/api/lab-import', {
-    format: 'stc-lab-submissions', version: '1.6.0', submissions: [
+    format: 'stc-lab-submissions', version: '1.6.1', submissions: [
       { client_id: 'c-sync-bad1', student: { roll_number: 'NOPE999' }, test_id: testId, answers: [], submitted_at: nowIso },
       { client_id: 'c-sync-bad2', student: { roll_number: 'LAB001' }, test_id: 'no-such-test', answers: [], submitted_at: nowIso },
       { client_id: 'c-sync-bad3', student: { roll_number: 'LAB001' }, test_id: testId, submitted_at: nowIso },

@@ -246,7 +246,6 @@ fieldset.course-checks legend { font-size: 14px; font-weight: 600; color: var(--
 fieldset.course-checks label { display: inline-flex; gap: 6px; align-items: center; margin: 4px 12px 4px 0; font-weight: 400; }
 fieldset.course-checks input { width: auto; margin: 0; }
 .lookup-msg { font-size: 14px; min-height: 18px; margin: -6px 0 10px; color: var(--emerald-dark); font-weight: 600; }
-.demo-hint { font-size: 13px; color: var(--grey); background: var(--bg); border: 1px solid var(--line-soft); border-radius: 12px; padding: 12px 14px; margin-top: 18px; text-align: left; }
 .import-result { font-size: 14px; margin-top: 10px; }
 .import-result .err { color: var(--red); }
 

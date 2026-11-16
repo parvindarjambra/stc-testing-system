@@ -589,3 +589,38 @@ locked), full match shows details with teacher auto-filled. Lab smoke
 wrong roll / full match + full exam + export + clear). Screenshots:
 v160-*.png in the project folder (not shipped in the ZIP). Version
 bumped to 1.6.0.
+
+## v1.6.1 (2026-11-16) — No credentials shown in the UI
+
+User order (angry, with a screenshot of the Admin login page): this is a
+REAL production system for Super Sys-Tech Computers Centre — not a demo —
+but the login pages DISPLAYED the passwords: admin.html showed
+'Demo: admin / admin123', teacher.html listed ALL 14 teacher usernames
+plus 'Password for all teachers: teacher123', principal.html showed
+'Demo: principal / principal123'. Fix: the demo-hint paragraphs are
+removed entirely from all three login pages (clean login form only, no
+replacement text) and the now-unused .demo-hint CSS rule is deleted. The
+Admin console teacher-import help text no longer shows a password value
+('Password (optional — a default is set automatically if left blank)'),
+and the two 'Download sample template' links now read 'Download
+template'. Full audit of public/, fragments/ and lab-template.html:
+zero matches for admin123/teacher123/principal123, zero 'demo-hint',
+zero 'sample', and zero user-visible 'Demo' wording — the only remaining
+'Demo' is the user-ordered demo row in students_template.csv, which
+stays. The accounts themselves are unchanged (admin/admin123,
+principal/principal123, teachers firstname/teacher123 all still log in);
+README/TEST_REPORT keep the logins as admin documentation only. No
+password-change feature added (user rejected it). No other functional
+changes.
+Tests: E2E 222 PASS, 0 FAIL (was 219; +3 new checks — login pages show
+no demo hints or passwords, style.css has no demo-hint rule, admin
+fragment shows no password value — and the old 'teacher login hint lists
+all 14 teachers' check rewritten to assert the login page lists NO
+teacher usernames); e2e-sync-test.js still 51 PASS, 0 FAIL.
+Headless-Chromium check (CDP, real server, 0 JS errors, 19/19 checks):
+all three staff login pages screenshotted with NO demo hint, NO password
+values and NO teacher usernames visible; a real admin login in the
+browser still works and the console shows no password values.
+Screenshots: v161-login-admin.png, v161-login-teacher.png,
+v161-login-principal.png, v161-admin-console.png in the project folder
+(not shipped in the ZIP). Version bumped to 1.6.1.

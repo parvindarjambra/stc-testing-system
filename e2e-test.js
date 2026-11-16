@@ -1,6 +1,6 @@
-// STC Testing System — end-to-end verification script (v1.6.0: four-field
-// student verification, real logo, back-to-home, teacher import,
-// fill-in-the-blank, course-wise results).
+// STC Testing System — end-to-end verification script (v1.6.1: no demo
+// hints in the UI; four-field student verification, real logo,
+// back-to-home, teacher import, fill-in-the-blank, course-wise results).
 // Usage: 1) wipe the test DB:  rm -f data/stc.sqlite data/*.json
 //        2) start server:      PORT=3102 node server.js   (auto-seeds users/courses on first start)
 //        3) run:               node e2e-test.js [baseUrl]
@@ -68,7 +68,7 @@ async function main() {
   const h = await req('GET', '/api/health');
   check('health 200 + ok', h.status === 200 && h.json && h.json.ok === true, JSON.stringify(h.json));
   check('db backend reported', h.json && (h.json.db === 'sqlite' || h.json.db === 'json'), h.json && h.json.db);
-  check('version is 1.6.0', h.json && h.json.version === '1.6.0', h.json && h.json.version);
+  check('version is 1.6.1', h.json && h.json.version === '1.6.1', h.json && h.json.version);
   const home = await req('GET', '/');
   check('home is the Student Terminal (institute name + verify form + heading)',
     home.status === 200 && home.text.includes('Super Sys-Tech Computers Centre') &&
@@ -92,6 +92,10 @@ async function main() {
   const priPage = await req('GET', '/principal');
   check('principal page serves login form only',
     priPage.status === 200 && priPage.text.includes('id="login-form"') && priPage.text.includes('Principal Login'));
+  check('login pages show NO demo hints or passwords (v1.6.1)',
+    [teaPage.text, admPage.text, priPage.text].every((t) =>
+      !t.includes('demo-hint') && !t.includes('admin123') && !t.includes('teacher123') &&
+      !t.includes('principal123') && !t.includes('Demo:')));
   check('portal pages are distinct',
     stuPage.text !== teaPage.text && teaPage.text !== admPage.text && admPage.text !== priPage.text);
   check('home (/) and /student serve the same terminal page', home.text === stuPage.text);
@@ -102,6 +106,7 @@ async function main() {
   const css = await req('GET', '/style.css');
   check('style.css serves + restyled theme (stc.edu.pk navy, terminal, sidebar)',
     css.status === 200 && css.text.includes('#0f172a') && css.text.includes('.terminal-card') && css.text.includes('.console-layout'));
+  check('style.css has NO demo-hint rule (v1.6.1)', !css.text.includes('demo-hint'));
   const tpl = await req('GET', '/students_template.csv');
   check('students_template.csv serves', tpl.status === 200 && tpl.text.includes('Roll Number'));
   const idx = await req('GET', '/index.html');
@@ -470,6 +475,8 @@ async function main() {
   const fragAdmin = await req('GET', '/fragments/admin-console.html', null, admin.token);
   check('admin fragment with admin token -> 200 + console markup',
     fragAdmin.status === 200 && fragAdmin.text.includes('tab-dashboard') && fragAdmin.text.includes('Day Consolidation'));
+  check('admin fragment shows NO password value in help text (v1.6.1)',
+    !fragAdmin.text.includes('teacher123') && !fragAdmin.text.includes('admin123') && !fragAdmin.text.includes('principal123'));
   const fragTeacher = await req('GET', '/fragments/teacher-console.html', null, tokens.kelash.token);
   check('teacher fragment with teacher token -> 200 + queue markup',
     fragTeacher.status === 200 && fragTeacher.text.includes('teacher-queue'));
@@ -521,8 +528,9 @@ async function main() {
     comSrc.includes('teachersForCourse') && comSrc.includes("indexOf('DIT')"));
   check('fallback note text present', comSrc.includes('showing Computer Instructors'));
   check('fallback note element in admin fragment', admFrag.includes('st-teacher-note'));
-  check('teacher login hint lists all 14 teachers, no nadir/dileep',
-    teaHtml.includes('ghansham') && teaHtml.includes('pawan') && teaHtml.includes('kapil') &&
+  check('teacher login page lists NO teacher usernames (v1.6.1: hints removed)',
+    !teaHtml.includes('demo-hint') && !teaHtml.includes('ghansham') && !teaHtml.includes('pawan') &&
+    !teaHtml.includes('kapil') && !teaHtml.includes('suneel') && !teaHtml.includes('teacher123') &&
     !teaHtml.includes('nadir') && !teaHtml.includes('dileep'));
   check('admin console has sidebar with Day Consolidation',
     admFrag.includes('class="sidebar"') && admFrag.includes('Day Consolidation') && admFrag.includes('data-tab="consolidation"'));
