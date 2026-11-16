@@ -624,3 +624,59 @@ browser still works and the console shows no password values.
 Screenshots: v161-login-admin.png, v161-login-teacher.png,
 v161-login-principal.png, v161-admin-console.png in the project folder
 (not shipped in the ZIP). Version bumped to 1.6.1.
+
+## v1.7.0 (2026-11-16) — Full-width consoles, inline errors, no student back/change
+
+Three console UX fixes in one release, all ordered by the user with
+screenshots:
+
+1. **Full-width consoles (ordered 08:54 PST).** The Admin Console looked
+narrow/cramped next to the Study Vault Admin Dashboard the user sent as a
+reference. Fix: staff consoles (Admin, Teacher, Principal) now fill the
+whole screen width — common.js toggles `body.console-mode` while the
+console is showing and style.css drops the 1160px container (main,
+header-inner, toast) in that mode. LAYOUT ONLY: the v1.5.0 design (dark
+navy sidebar, pill badges, gradient active tab) is unchanged, and NO Study
+Vault features were added (no stat cards, Security Center, Activity Logs,
+Messages, notifications — all still rejected). Login pages and the Student
+Terminal keep their centred cards; the phone layout still stacks the
+sidebar above the content.
+2. **Inline validation errors + auto-scroll (ordered 08:58 PST).** A
+test-builder error ('Question 2: a fill-in-the-blank question needs ___
+for the blank.') appeared ONLY in the top-of-page toast, which an Admin
+scrolled down the Questions list never sees. Fix: the error now shows
+INLINE under the offending question card (red border + red message) and
+smooth-scrolls that card into view; form-level errors (title/course/
+duration/month, no questions) show in a `#tb-form-error` slot above the
+Save button, also scrolled into view. Editing a question clears its inline
+error. The same inline + auto-scroll pattern now applies to the other
+console forms whose errors were toast-only: student add/edit
+(`#st-form-error`), teacher add/edit (`#tc-form-error`), course add/rename
+(`#course-form-error`) and teacher grading (`#grade-form-error`), via
+shared `showFormError`/`hideFormError` helpers in common.js. Validation
+rules are unchanged — only where/how errors are shown. The top toast still
+shows too.
+3. **No student back/change (ordered ~08:59 PST).** The test picker had a
+plain 'Back — change details' link and the details screen a 'Change
+details' button — the user asked why the student is given permission to go
+back and change details. Both controls (and their JS handlers) are removed
+from the online terminal AND the lab app; the now-unused `.btn-link` CSS
+rule is deleted too. After verification the student can only go forward:
+Confirm → test picker → Start Exam → submit → reset for the next student
+(the post-submit reset stays as-is).
+
+Tests: E2E 237 PASS, 0 FAIL (was 222; +15 new checks in §23 — full-width
+console-mode rules + toggle, inline-error styles + helpers + builder
+wiring, form-error slots in both fragments, and the back/change controls
+asserted ABSENT in the terminal and the lab app with the forward-only flow
+asserted present); e2e-sync-test.js still 51 PASS, 0 FAIL.
+Headless-Chromium check (CDP, real server, 0 JS errors, 34/34 checks):
+console-main spans to 1260/1280px at desktop with the teachers table at
+full width; the FIB-without-___ error verified live in the browser
+(exact text, under the Q2 card, card scrolled into view, clears on edit);
+phone 390 layout stacks with no horizontal overflow; terminal + lab app
+details/picker show NO back/change controls while Confirm and Start Exam
+still work. Lab smoke of the real exported STC-Lab.html: 23/23 PASS.
+Screenshots: v170-console-desktop.png, v170-console-phone.png,
+v170-inline-error.png, v170-no-back-link.png, v170-lab-no-back-link.png
+in the project folder (not shipped in the ZIP). Version bumped to 1.7.0.

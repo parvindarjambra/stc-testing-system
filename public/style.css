@@ -1,4 +1,4 @@
-/* STC Testing System v1.5.1 — home page is the Student Terminal.
+/* STC Testing System v1.7.0 — full-width staff consoles + inline errors.
    Clean, modern console design: deep-navy sidebar, soft layered shadows,
    rounded-2xl cards, pill badges, emerald→teal→cyan brand gradient.
    System fonts only, zero external assets (no remote libraries, no web
@@ -173,6 +173,7 @@ main { max-width: 1160px; margin: 0 auto; padding: 26px 20px; }
   padding: 24px 26px;
   margin-bottom: 18px;
   box-shadow: var(--shadow-card);
+  scroll-margin-top: 70px; /* so scrollIntoView clears the sticky topbar */
 }
 .card.narrow { max-width: 560px; margin-left: auto; margin-right: auto; }
 .card h2, .card h3 { color: var(--navy); margin-top: 0; font-weight: 800; }
@@ -273,8 +274,6 @@ fieldset.course-checks input { width: auto; margin: 0; }
 .btn-danger:hover { background: #FEF2F2; color: var(--red); border-color: var(--red); }
 .btn-small { padding: 7px 13px; font-size: 13px; border-radius: 10px; }
 .btn-big { padding: 13px 28px; font-size: 16px; border-radius: 14px; }
-.btn-link { background: none; border: none; color: var(--navy2); text-decoration: underline; padding: 4px 0; box-shadow: none; }
-.btn-link:hover { transform: none; box-shadow: none; }
 .btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
 .btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin: 12px 0; }
 
@@ -380,7 +379,22 @@ tr.clickable:hover td { background: #f0fdfa; }
 .marks-input { width: 90px !important; display: inline-block !important; }
 
 /* ---------- Test builder ---------- */
-.qb-card { border: 1px solid var(--line); border-radius: 16px; padding: 16px; margin-bottom: 12px; background: #F8FAFC; }
+.qb-card { border: 1px solid var(--line); border-radius: 16px; padding: 16px; margin-bottom: 12px; background: #F8FAFC; scroll-margin-top: 70px; }
+
+/* ---------- Inline errors (v1.7.0) ----------
+   Validation errors show AT the offending question/field and scroll
+   into view — never only in the top toast, which nobody scrolls up to. */
+.form-error {
+  background: var(--red-soft); color: #991B1B; border: 1px solid #fca5a5;
+  border-radius: 12px; padding: 11px 14px;
+  font-size: 14px; font-weight: 700; margin: 12px 0;
+}
+.qb-card.has-error { border-color: var(--red); box-shadow: 0 0 0 3px rgba(185, 28, 28, 0.12); }
+.qb-error {
+  background: var(--red-soft); color: #991B1B; border: 1px solid #fca5a5;
+  border-radius: 12px; padding: 10px 13px;
+  font-size: 14px; font-weight: 700; margin: 12px 0 0;
+}
 .qb-card h5 { margin: 0 0 8px; color: var(--navy2); }
 .qb-opts { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
 .qb-opts label { font-weight: 400; }
@@ -492,6 +506,15 @@ tr.clickable:hover td { background: #f0fdfa; }
 .sidebar .tab.active { background: var(--grad-brand); color: #fff; box-shadow: var(--shadow-btn); }
 .tab-icon { font-size: 17px; width: 22px; flex: 0 0 22px; text-align: center; line-height: 1; }
 .console-main { flex: 1; min-width: 0; }
+
+/* ---------- Full-width console (v1.7.0) ----------
+   Staff consoles fill the whole screen width like the Study Vault
+   reference — no narrow centred container. common.js toggles
+   body.console-mode while the console is showing; login pages and the
+   Student Terminal keep their centred cards. */
+body.console-mode main { max-width: none; }
+body.console-mode .header-inner { max-width: none; }
+body.console-mode .toast { max-width: none; margin-left: 20px; margin-right: 20px; }
 
 @media (max-width: 700px) {
   .console-layout { flex-direction: column; }

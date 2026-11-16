@@ -87,6 +87,7 @@ async function loadCourses() {
 
 async function saveCourse(e) {
   e.preventDefault();
+  hideFormError('course-form-error');
   const name = $('course-name').value.trim();
   if (!name) return;
   try {
@@ -102,7 +103,7 @@ async function saveCourse(e) {
     $('course-submit').textContent = 'Add Course';
     $('course-cancel').classList.add('hidden');
     loadCourses(); loadReference();
-  } catch (err) { toast('Save failed: ' + err.message, false); }
+  } catch (err) { showFormError('course-form-error', 'Save failed: ' + err.message); }
 }
 
 /* ----- Students: list / add / edit / delete / CSV import ----- */
@@ -169,12 +170,14 @@ function openStudentForm(s) {
   $('st-shift').value = s ? s.shift : '';
   $('st-teacher').innerHTML = teacherOptions(s ? s.course : '', s ? s.teacher_id : null);
   $('st-teacher-note').textContent = teacherFallbackNote(s ? s.course : '');
+  hideFormError('st-form-error');
   $('student-form-card').classList.remove('hidden');
   $('student-form-card').scrollIntoView({ behavior: 'smooth' });
 }
 
 async function saveStudent(e) {
   e.preventDefault();
+  hideFormError('st-form-error');
   const teacherId = $('st-teacher').value;
   const body = {
     roll_number: $('st-roll').value.trim(),
@@ -196,7 +199,7 @@ async function saveStudent(e) {
     $('student-form').reset();
     S.editingStudentId = null;
     loadStudents();
-  } catch (err) { toast('Save failed: ' + err.message, false); }
+  } catch (err) { showFormError('st-form-error', 'Save failed: ' + err.message); }
 }
 
 function importStudentsCsv() {
@@ -281,8 +284,8 @@ function renderBuilderQuestions() {
   }).join('');
 
   box.querySelectorAll('[data-bq]').forEach((el) => {
-    el.addEventListener('input', () => syncBuilderField(el));
-    el.addEventListener('change', () => syncBuilderField(el));
+    el.addEventListener('input', () => { syncBuilderField(el); clearBuilderCardError(el); });
+    el.addEventListener('change', () => { syncBuilderField(el); clearBuilderCardError(el); });
   });
   box.querySelectorAll('[data-bq-del]').forEach((b) => {
     b.addEventListener('click', () => {
@@ -303,6 +306,44 @@ function syncBuilderField(el) {
   else q[field] = el.value;
 }
 
+/* Inline builder errors (v1.7.0): the error shows UNDER the offending
+   question card (red border + red message) and scrolls it into view, so
+   an Admin scrolled down the Questions list sees it at once. Form-level
+   errors (title/course/duration/month, no questions) show in the
+   #tb-form-error slot above the Save button, also scrolled into view.
+   The top toast still shows too — the inline error is the one that
+   matters. Validation rules are unchanged; only where errors appear. */
+function clearBuilderErrors() {
+  document.querySelectorAll('#tb-questions .qb-error').forEach((el) => el.remove());
+  document.querySelectorAll('#tb-questions .qb-card.has-error').forEach((el) => el.classList.remove('has-error'));
+  hideFormError('tb-form-error');
+}
+function clearBuilderCardError(el) {
+  const card = el.closest('.qb-card');
+  if (!card) return;
+  card.classList.remove('has-error');
+  const err = card.querySelector('.qb-error');
+  if (err) err.remove();
+}
+function showBuilderQuestionError(index, msg) {
+  clearBuilderErrors();
+  const cards = document.querySelectorAll('#tb-questions .qb-card');
+  const card = cards[index];
+  if (card) {
+    card.classList.add('has-error');
+    const p = document.createElement('p');
+    p.className = 'qb-error';
+    p.textContent = msg;
+    card.appendChild(p);
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+  toast(msg, false);
+}
+function showBuilderFormError(msg) {
+  clearBuilderErrors();
+  showFormError('tb-form-error', msg);
+}
+
 function resetTestBuilder() {
   S.editingTestId = null;
   S.builderQuestions = [];
@@ -314,6 +355,7 @@ function resetTestBuilder() {
   $('tb-duration').value = 30;
   $('tb-randomize').checked = true;
   $('tb-cancel').classList.add('hidden');
+  clearBuilderErrors();
   syncMonthPicker();
   renderBuilderQuestions();
 }
@@ -324,19 +366,19 @@ async function saveTest() {
   const type = $('tb-type').value;
   const month = $('tb-month').value;
   const duration = parseInt($('tb-duration').value, 10);
-  if (!title || !course || !duration || duration < 1) { toast('Fill in title, course and duration.', false); return; }
+  if (!title || !course || !duration || duration < 1) { showBuilderFormError('Fill in title, course and duration.'); return; }
   if (type === 'monthly-test' && !/^\d{4}-\d{2}$/.test(month)) {
-    toast('Monthly tests need a Month (YYYY-MM).', false); return;
+    showBuilderFormError('Monthly tests need a Month (YYYY-MM).'); return;
   }
-  if (!S.builderQuestions.length) { toast('Add at least one question.', false); return; }
+  if (!S.builderQuestions.length) { showBuilderFormError('Add at least one question.'); return; }
   for (let i = 0; i < S.builderQuestions.length; i++) {
     const q = S.builderQuestions[i];
-    if (!q.question.trim()) { toast('Question ' + (i + 1) + ' has no text.', false); return; }
+    if (!q.question.trim()) { showBuilderQuestionError(i, 'Question ' + (i + 1) + ' has no text.'); return; }
     if (q.type === 'mcq' && q.options.some((o) => !String(o).trim())) {
-      toast('Question ' + (i + 1) + ': fill in all 4 options.', false); return;
+      showBuilderQuestionError(i, 'Question ' + (i + 1) + ': fill in all 4 options.'); return;
     }
     if (q.type === 'fib' && q.question.indexOf('___') === -1) {
-      toast('Question ' + (i + 1) + ': a fill-in-the-blank question needs ___ for the blank.', false); return;
+      showBuilderQuestionError(i, 'Question ' + (i + 1) + ': a fill-in-the-blank question needs ___ for the blank.'); return;
     }
   }
   const body = {
@@ -356,7 +398,7 @@ async function saveTest() {
     }
     resetTestBuilder();
     loadTests();
-  } catch (e) { toast('Save failed: ' + e.message, false); }
+  } catch (e) { showBuilderFormError('Save failed: ' + e.message); }
 }
 
 async function loadTests() {
@@ -604,6 +646,7 @@ async function printCourseWiseSheet() {
 
 function openTeacherForm(u) {
   S.editingUserId = u ? u.id : null;
+  hideFormError('tc-form-error');
   $('teacher-form-title').textContent = u ? 'Edit Teacher' : 'Add Teacher';
   $('tc-username').value = u ? u.username : '';
   $('tc-username').disabled = !!u;
@@ -643,7 +686,7 @@ async function saveTeacher(e) {
     openTeacherForm(null);
     $('teacher-form').reset();
     loadTeachersAdmin(); loadReference();
-  } catch (err) { toast('Save failed: ' + err.message, false); }
+  } catch (err) { showFormError('tc-form-error', 'Save failed: ' + err.message); }
 }
 
 function initAdmin() {

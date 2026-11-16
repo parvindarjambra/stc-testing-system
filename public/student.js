@@ -118,22 +118,10 @@ function initStudent() {
   });
 
   $('stu-confirm').addEventListener('click', () => loadTestPicker());
-  $('stu-change-roll').addEventListener('click', () => {
-    S.student = null;
-    $('stu-details').classList.add('hidden');
-    $('stu-name').value = '';
-    $('stu-father').value = '';
-    $('stu-course').value = '';
-    $('stu-roll').value = '';
-    $('stu-verify-msg').textContent = '';
-    $('stu-verify-msg').className = 'lookup-msg';
-    $('stu-start').classList.remove('hidden');
-    $('stu-name').focus();
-  });
-  $('stu-tests-back').addEventListener('click', () => {
-    $('stu-tests').classList.add('hidden');
-    $('stu-details').classList.remove('hidden');
-  });
+  // No back / change-details control here by design (v1.7.0): once
+  // verified, the student can only go forward (Confirm -> test picker
+  // -> exam -> submit -> reset for the next student). Details come from
+  // Admin's list and cannot be changed at the terminal.
 
   $('exam-submit').addEventListener('click', () => submitExam(false));
   $('stu-result-done').addEventListener('click', resetStudent);

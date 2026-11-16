@@ -50,6 +50,24 @@ function toast(msg, ok) {
   toast._t = setTimeout(() => { el.className = 'toast hidden'; }, 6000);
 }
 
+/* Inline form errors (v1.7.0): show the message AT the form (in the
+   element with the given id) and scroll it into view, so a validation
+   failure is never visible only in the top toast. The toast still shows
+   too — the inline error is the one the user actually sees. */
+function showFormError(id, msg) {
+  const el = $(id);
+  if (el) {
+    el.textContent = msg;
+    el.classList.remove('hidden');
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+  toast(msg, false);
+}
+function hideFormError(id) {
+  const el = $(id);
+  if (el) { el.textContent = ''; el.classList.add('hidden'); }
+}
+
 /* ---------------- App state ---------------- */
 const S = {
   token: null, user: null,
@@ -339,6 +357,7 @@ async function restoreSession(role) {
 /* Show ONLY the login form (console hidden and emptied, no data visible). */
 function showPortalLogin() {
   document.body.classList.add('login-mode');
+  document.body.classList.remove('console-mode');
   const c = $('view-console'); if (c) c.classList.add('hidden');
   const l = $('view-login'); if (l) l.classList.remove('hidden');
   const chip = $('user-chip'); if (chip) chip.textContent = '';
@@ -355,6 +374,7 @@ async function enterConsole(fragment, onReady) {
   if (!res.ok) throw new Error('Could not load console (' + res.status + ')');
   $('console').innerHTML = await res.text();
   document.body.classList.remove('login-mode');
+  document.body.classList.add('console-mode'); /* full-width console (v1.7.0) */
   $('view-login').classList.add('hidden');
   $('view-console').classList.remove('hidden');
   $('user-chip').textContent = S.user.name + ' (' + S.user.role + ')';

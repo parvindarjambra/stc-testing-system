@@ -1,6 +1,7 @@
-// STC Testing System — end-to-end verification script (v1.6.1: no demo
-// hints in the UI; four-field student verification, real logo,
-// back-to-home, teacher import, fill-in-the-blank, course-wise results).
+// STC Testing System — end-to-end verification script (v1.7.0: full-width
+// consoles, inline validation errors, no student back/change; no demo hints
+// in the UI; four-field student verification, real logo, back-to-home,
+// teacher import, fill-in-the-blank, course-wise results).
 // Usage: 1) wipe the test DB:  rm -f data/stc.sqlite data/*.json
 //        2) start server:      PORT=3102 node server.js   (auto-seeds users/courses on first start)
 //        3) run:               node e2e-test.js [baseUrl]
@@ -68,7 +69,7 @@ async function main() {
   const h = await req('GET', '/api/health');
   check('health 200 + ok', h.status === 200 && h.json && h.json.ok === true, JSON.stringify(h.json));
   check('db backend reported', h.json && (h.json.db === 'sqlite' || h.json.db === 'json'), h.json && h.json.db);
-  check('version is 1.6.1', h.json && h.json.version === '1.6.1', h.json && h.json.version);
+  check('version is 1.7.0', h.json && h.json.version === '1.7.0', h.json && h.json.version);
   const home = await req('GET', '/');
   check('home is the Student Terminal (institute name + verify form + heading)',
     home.status === 200 && home.text.includes('Super Sys-Tech Computers Centre') &&
@@ -717,6 +718,41 @@ async function main() {
     const r = await req(m, p, m === 'POST' ? { csv: '' } : undefined);
     check(m + ' ' + p + ' without token -> 401', r.status === 401, 'got ' + r.status);
   }
+
+  console.log('\n[23] v1.7.0 — full-width consoles, inline errors, no student back/change');
+  check('full-width console: style.css has console-mode rules (no narrow container)',
+    css.text.includes('body.console-mode main') && css.text.includes('max-width: none'));
+  check('common.js toggles console-mode on login/logout (v1.7.0)',
+    comSrc.includes("classList.add('console-mode')") && comSrc.includes("classList.remove('console-mode')"));
+  check('inline-error styles present (.form-error, .qb-error, .has-error)',
+    css.text.includes('.form-error') && css.text.includes('.qb-error') && css.text.includes('.qb-card.has-error'));
+  check('shared showFormError/hideFormError helpers in common.js (v1.7.0)',
+    comSrc.includes('function showFormError') && comSrc.includes('function hideFormError') &&
+    comSrc.includes('scrollIntoView'));
+  check('test builder shows question errors inline under the card + scrolls (v1.7.0)',
+    admJs13.includes('showBuilderQuestionError') && admJs13.includes('qb-error') &&
+    admJs13.includes('has-error') && admJs13.includes('scrollIntoView'));
+  check('test builder shows form errors inline above Save (v1.7.0)',
+    admJs13.includes('showBuilderFormError') && admFrag.includes('tb-form-error'));
+  check('admin fragment has inline error slots for student/teacher/course forms (v1.7.0)',
+    admFrag.includes('st-form-error') && admFrag.includes('tc-form-error') && admFrag.includes('course-form-error'));
+  check('teacher fragment has inline grade error slot (v1.7.0)',
+    teaFrag.includes('grade-form-error'));
+  check('student page has NO change-details button (v1.7.0)',
+    !stuHtml.includes('stu-change-roll') && !stuHtml.includes('Change details'));
+  check('student page has NO back-to-change link in test picker (v1.7.0)',
+    !stuHtml.includes('stu-tests-back') && !stuHtml.includes('Back — change details'));
+  check('student.js has NO change/back handlers (v1.7.0)',
+    !stuSrc.includes('stu-change-roll') && !stuSrc.includes('stu-tests-back'));
+  check('lab app has NO change-details button or back link (v1.7.0)',
+    !labSrc.includes('stu-change-roll') && !labSrc.includes('stu-tests-back') &&
+    !labSrc.includes('Change details'));
+  check('student forward-only flow kept: Confirm + submit + reset for next student (v1.7.0)',
+    stuSrc.includes('stu-confirm') && stuSrc.includes('resetStudent') && stuSrc.includes('submitExam'));
+  check('lab forward-only flow kept: Confirm + submit + reset (v1.7.0)',
+    labSrc.includes('stu-confirm') && labSrc.includes('resetStudent') && labSrc.includes('submitExam'));
+  check('dead .btn-link CSS removed (only used by the back link) (v1.7.0)',
+    !css.text.includes('.btn-link'));
 
   console.log('\n========================================');
   console.log('E2E RESULT: ' + pass + ' PASS, ' + fail + ' FAIL');

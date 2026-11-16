@@ -48,6 +48,7 @@
           <button class="btn btn-primary" type="submit" id="course-submit">Add Course</button>
           <button class="btn hidden" type="button" id="course-cancel">Cancel Edit</button>
         </form>
+        <p id="course-form-error" class="form-error hidden"></p>
         <div id="course-list" class="table-wrap"></div>
       </div>
     </div>
@@ -75,6 +76,7 @@
           <label>Shift <select id="st-shift" required></select></label>
           <label>Assigned Teacher <select id="st-teacher"></select></label>
           <p id="st-teacher-note" class="lookup-msg"></p>
+          <p id="st-form-error" class="form-error hidden"></p>
           <div class="btn-row">
             <button class="btn btn-primary" type="submit">Save Student</button>
             <button class="btn" type="button" id="student-form-cancel">Cancel</button>
@@ -119,6 +121,7 @@
           <button class="btn" type="button" id="tb-add-fib">+ Add Fill in the Blank</button>
           <button class="btn" type="button" id="tb-add-theory">+ Add Theory Question</button>
         </div>
+        <p id="tb-form-error" class="form-error hidden"></p>
         <div class="btn-row">
           <button class="btn btn-primary btn-big" type="button" id="tb-save">Save Test</button>
           <button class="btn hidden" type="button" id="tb-cancel">Cancel Edit</button>
@@ -242,6 +245,7 @@
           <label>Password <input id="tc-password" type="password" required placeholder="Leave blank when editing to keep current"></label>
           <label>Full Name <input id="tc-name" type="text" required></label>
           <fieldset class="course-checks"><legend>Courses taught</legend><div id="tc-courses"></div></fieldset>
+          <p id="tc-form-error" class="form-error hidden"></p>
           <div class="btn-row">
             <button class="btn btn-primary" type="submit" id="tc-submit">Save Teacher</button>
             <button class="btn hidden" type="button" id="tc-cancel">Cancel Edit</button>

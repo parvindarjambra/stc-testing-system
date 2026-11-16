@@ -16,6 +16,7 @@
 // which auto-grades MCQs server-side and dedupes by client_id.
 // v1.6.0: four-field student verification (name/father/course/roll).
 // v1.6.1: no credentials shown in the UI (demo hints removed from login pages).
+// v1.7.0: full-width staff consoles + inline validation errors + no student back/change.
 
 'use strict';
 
@@ -26,7 +27,7 @@ const crypto = require('crypto');
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = '0.0.0.0';
-const VERSION = '1.6.1';
+const VERSION = '1.7.0';
 const ROOT = __dirname;
 const DATA_DIR = path.join(ROOT, 'data');
 const PUBLIC_DIR = path.join(ROOT, 'public');

@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- =====================================================================
-     STC Testing System — Offline Lab App (USB sync, v1.6.1).
+     STC Testing System — Offline Lab App (USB sync, v1.7.0).
      Super Sys-Tech Computers Centre, Umerkot.
 
      SELF-CONTAINED: inline CSS + inline JS, ZERO external references,
@@ -150,7 +150,6 @@ th { color: #475569; font-weight: 600; width: 38%; }
     <div id="stu-details-body"></div>
     <div class="btn-row">
       <button class="btn btn-primary btn-big" type="button" id="stu-confirm">Confirm &amp; Show My Tests</button>
-      <button class="btn" type="button" id="stu-change-roll">Change details</button>
     </div>
   </div>
 
@@ -159,7 +158,6 @@ th { color: #475569; font-weight: 600; width: 38%; }
     <h2>Select Your Test</h2>
     <p id="stu-tests-who" class="muted"></p>
     <div id="stu-test-list" class="card-grid"></div>
-    <p><button class="btn" type="button" id="stu-tests-back">Back — change details</button></p>
   </div>
 
   <!-- Step 3: exam screen -->
@@ -312,22 +310,10 @@ function initLab() {
   });
 
   $('stu-confirm').addEventListener('click', loadTestPicker);
-  $('stu-change-roll').addEventListener('click', function () {
-    S.student = null;
-    $('stu-details').classList.add('hidden');
-    $('stu-name').value = '';
-    $('stu-father').value = '';
-    $('stu-course').value = '';
-    $('stu-roll').value = '';
-    $('stu-verify-msg').textContent = '';
-    $('stu-verify-msg').className = 'lookup-msg';
-    $('stu-start').classList.remove('hidden');
-    $('stu-name').focus();
-  });
-  $('stu-tests-back').addEventListener('click', function () {
-    $('stu-tests').classList.add('hidden');
-    $('stu-details').classList.remove('hidden');
-  });
+  /* No back / change-details control here by design (v1.7.0): once
+     verified, the student can only go forward (Confirm -> test picker
+     -> exam -> submit -> reset for the next student). Details come from
+     Admin's list and cannot be changed at the terminal. */
   $('exam-submit').addEventListener('click', function () { submitExam(false); });
   $('stu-result-done').addEventListener('click', resetStudent);
   $('btn-export').addEventListener('click', exportSubmissions);
@@ -561,7 +547,7 @@ function exportSubmissions() {
     '-' + pad(now.getHours()) + pad(now.getMinutes());
   var envelope = {
     format: 'stc-lab-submissions',
-    version: '1.6.1',
+    version: '1.7.0',
     pack_id: (LAB_PACK && LAB_PACK.pack_id) || null,
     exported_at: now.toISOString(),
     submissions: saved

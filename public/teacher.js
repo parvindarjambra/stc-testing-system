@@ -86,6 +86,7 @@ async function openGrading(subId) {
         inp.addEventListener('input', updateGradeTotal);
       });
     }
+    hideFormError('grade-form-error');
     $('grade-save').disabled = !!sub.locked;
     $('grade-send').disabled = !!sub.locked;
     updateGradeTotal();
@@ -122,7 +123,7 @@ async function saveGrades() {
     S.grading.submission = d.submission || S.grading.submission;
     toast('Grades saved. Total: ' + S.grading.submission.total + ' / ' + S.grading.submission.max_total, true);
     loadTeacherQueue();
-  } catch (e) { toast('Could not save grades: ' + e.message, false); }
+  } catch (e) { showFormError('grade-form-error', 'Could not save grades: ' + e.message); }
 }
 
 async function sendToAdmin() {
@@ -138,7 +139,7 @@ async function sendToAdmin() {
     $('grade-panel').classList.add('hidden');
     S.grading = null;
     loadTeacherQueue();
-  } catch (e) { toast('Could not send: ' + e.message, false); }
+  } catch (e) { showFormError('grade-form-error', 'Could not send: ' + e.message); }
 }
 
 async function bulkSendToday() {
