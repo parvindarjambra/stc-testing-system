@@ -1,0 +1,224 @@
+<span class="section-label">Admin Console</span>
+<h2 class="page-title">Admin / Exam Controller</h2>
+<p id="admin-welcome" class="muted"></p>
+
+<div class="console-layout">
+  <aside class="sidebar">
+    <button class="tab active" type="button" data-tab="dashboard">Dashboard</button>
+    <button class="tab" type="button" data-tab="students">Students</button>
+    <button class="tab" type="button" data-tab="tests">Tests</button>
+    <button class="tab" type="button" data-tab="results">Results</button>
+    <button class="tab" type="button" data-tab="monthly">Monthly Reports</button>
+    <button class="tab" type="button" data-tab="consolidation">7:30 PM Consolidation</button>
+    <button class="tab" type="button" data-tab="courses">Courses</button>
+    <button class="tab" type="button" data-tab="teachers">Teachers</button>
+  </aside>
+  <div class="console-main">
+    <!-- Dashboard -->
+    <div id="tab-dashboard" class="tab-panel">
+      <div class="card">
+        <h3>Today — Live Shift Monitor</h3>
+        <div class="filters">
+          <label>Date <input id="dash-date" type="date"></label>
+          <button class="btn" type="button" id="dash-refresh">Refresh</button>
+        </div>
+        <div id="dash-totals" class="stat-grid"></div>
+        <h4>Submissions per Shift (7 AM – 7 PM)</h4>
+        <div id="dash-shifts" class="table-wrap"></div>
+        <h4>Submissions per Course</h4>
+        <div id="dash-courses" class="table-wrap"></div>
+        <h4>Per Teacher</h4>
+        <div id="dash-teachers" class="table-wrap"></div>
+      </div>
+    </div>
+
+    <!-- Courses -->
+    <div id="tab-courses" class="tab-panel hidden">
+      <div class="card">
+        <h3>Courses</h3>
+        <form id="course-form" class="inline-form">
+          <input id="course-name" type="text" placeholder="Course name" required>
+          <button class="btn btn-primary" type="submit" id="course-submit">Add Course</button>
+          <button class="btn hidden" type="button" id="course-cancel">Cancel Edit</button>
+        </form>
+        <div id="course-list" class="table-wrap"></div>
+      </div>
+    </div>
+
+    <!-- Students -->
+    <div id="tab-students" class="tab-panel hidden">
+      <div class="card">
+        <h3>Students</h3>
+        <div class="filters">
+          <label>Search <input id="st-search" type="text" placeholder="Name or roll number"></label>
+          <label>Course <select id="st-course-filter"><option value="">All courses</option></select></label>
+          <label>Shift <select id="st-shift-filter"><option value="">All shifts</option></select></label>
+          <button class="btn" type="button" id="st-refresh">Search</button>
+          <button class="btn btn-primary" type="button" id="st-add-btn">Add Student</button>
+        </div>
+        <div id="student-list" class="table-wrap"></div>
+      </div>
+      <div id="student-form-card" class="card hidden">
+        <h3 id="student-form-title">Add Student</h3>
+        <form id="student-form" class="form-grid">
+          <label>Roll Number <input id="st-roll" type="text" required></label>
+          <label>Student Name <input id="st-name" type="text" required></label>
+          <label>Father's Name <input id="st-father" type="text" required></label>
+          <label>Course <select id="st-course" required></select></label>
+          <label>Shift <select id="st-shift" required></select></label>
+          <label>Assigned Teacher <select id="st-teacher"></select></label>
+          <p id="st-teacher-note" class="lookup-msg"></p>
+          <div class="btn-row">
+            <button class="btn btn-primary" type="submit">Save Student</button>
+            <button class="btn" type="button" id="student-form-cancel">Cancel</button>
+          </div>
+        </form>
+      </div>
+      <div class="card">
+        <h3>Import Students (CSV)</h3>
+        <p class="muted">CSV columns: Roll Number, Student Name, Father's Name, Course, Shift, Assigned Teacher.</p>
+        <p><a class="btn" href="students_template.csv" download>Download sample template</a></p>
+        <div class="inline-form">
+          <input id="st-csv-file" type="file" accept=".csv,text/csv">
+          <button class="btn btn-primary" type="button" id="st-csv-import">Import CSV</button>
+        </div>
+        <div id="st-csv-result" class="import-result"></div>
+      </div>
+    </div>
+
+    <!-- Test Builder -->
+    <div id="tab-tests" class="tab-panel hidden">
+      <div class="card">
+        <h3 id="test-builder-title">Create Test</h3>
+        <form id="test-form" class="form-grid">
+          <label>Test Title <input id="tb-title" type="text" required placeholder="e.g. DIT Monthly Test"></label>
+          <label>Course <select id="tb-course" required></select></label>
+          <label>Type
+            <select id="tb-type" required>
+              <option value="daily-quiz">Daily Quiz</option>
+              <option value="monthly-test">Monthly Test</option>
+            </select>
+          </label>
+          <label id="tb-month-wrap" class="hidden">Month (for Monthly Test)
+            <input id="tb-month" type="month">
+          </label>
+          <label>Duration (minutes) <input id="tb-duration" type="number" min="1" value="30" required></label>
+          <label class="check-label"><input id="tb-randomize" type="checkbox" checked> Shuffle question order for students</label>
+        </form>
+        <h4>Questions</h4>
+        <div id="tb-questions"></div>
+        <div class="btn-row">
+          <button class="btn" type="button" id="tb-add-mcq">+ Add MCQ</button>
+          <button class="btn" type="button" id="tb-add-fib">+ Add Fill in the Blank</button>
+          <button class="btn" type="button" id="tb-add-theory">+ Add Theory Question</button>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary btn-big" type="button" id="tb-save">Save Test</button>
+          <button class="btn hidden" type="button" id="tb-cancel">Cancel Edit</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3>All Tests</h3>
+        <div class="filters">
+          <label>Course <select id="tb-filter-course"><option value="">All courses</option></select></label>
+          <label>Type
+            <select id="tb-filter-type">
+              <option value="">All types</option>
+              <option value="daily-quiz">Daily Quiz</option>
+              <option value="monthly-test">Monthly Test</option>
+            </select>
+          </label>
+          <button class="btn" type="button" id="tb-filter-refresh">Refresh</button>
+        </div>
+        <div id="test-list" class="table-wrap"></div>
+      </div>
+    </div>
+
+    <!-- Results review -->
+    <div id="tab-results" class="tab-panel hidden">
+      <div class="card">
+        <h3>Results Review — Sent by Teachers</h3>
+        <p class="muted">Finalize a result to lock it into the official record.</p>
+        <div class="filters">
+          <label>Date <input id="res-date" type="date"></label>
+          <button class="btn" type="button" id="res-refresh">Refresh</button>
+          <button class="btn" type="button" id="res-export">Export Results to Excel (CSV)</button>
+        </div>
+        <p class="muted">Export downloads all results for the month of the selected date, grouped by course.</p>
+        <div id="results-list" class="table-wrap"></div>
+      </div>
+    </div>
+
+    <!-- Monthly report -->
+    <div id="tab-monthly" class="tab-panel hidden">
+      <div class="card">
+        <h3>Monthly Report</h3>
+        <div class="filters">
+          <label>Month <input id="mr-month" type="month"></label>
+          <button class="btn" type="button" id="mr-load">Load Report</button>
+          <button class="btn" type="button" id="mr-export">Export CSV</button>
+          <button class="btn" type="button" id="mr-print">Print</button>
+        </div>
+        <div class="filters">
+          <button class="btn btn-primary" type="button" id="mr-export-results">Export Results to Excel (CSV)</button>
+          <button class="btn" type="button" id="mr-print-coursewise">Print Course-wise Result Sheet</button>
+        </div>
+        <p class="muted">Course-wise export and print list every student's result for the month, grouped and sorted by course.</p>
+        <div id="monthly-report" class="table-wrap"></div>
+      </div>
+    </div>
+
+    <!-- Consolidation -->
+    <div id="tab-consolidation" class="tab-panel hidden">
+      <div class="card highlight-card">
+        <h3>7:30 PM End-of-Day Consolidation &amp; Sync</h3>
+        <p class="muted">Compiles every submission for the day into one locked master sheet. This also runs automatically at 7:30 PM. Safe to run again — it never duplicates rows.</p>
+        <div class="filters">
+          <label>Date <input id="con-date" type="date"></label>
+          <button class="btn btn-emerald btn-big" type="button" id="con-run">Run 7:30 PM Consolidation &amp; Sync</button>
+        </div>
+        <p id="con-run-result" class="con-result"></p>
+      </div>
+      <div class="card">
+        <h3>Consolidation History</h3>
+        <div id="con-days" class="btn-row"></div>
+        <div id="con-day-view" class="table-wrap"></div>
+        <div class="btn-row">
+          <button class="btn hidden" type="button" id="con-export">Export Day CSV</button>
+          <button class="btn hidden" type="button" id="con-print">Print Day Sheet</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Teachers -->
+    <div id="tab-teachers" class="tab-panel hidden">
+      <div class="card">
+        <h3>Teachers</h3>
+        <div id="teacher-list" class="table-wrap"></div>
+      </div>
+      <div class="card">
+        <h3>Import Teachers (CSV)</h3>
+        <p class="muted">CSV columns: Teacher Name, Course (several courses separated by ';'), Username (optional — auto from first name), Password (optional — default teacher123). A username that already exists rejects that row.</p>
+        <p><a class="btn" href="teachers_template.csv" download>Download sample template</a></p>
+        <div class="inline-form">
+          <input id="tc-csv-file" type="file" accept=".csv,text/csv">
+          <button class="btn btn-primary" type="button" id="tc-csv-import">Import CSV</button>
+        </div>
+        <div id="tc-csv-result" class="import-result"></div>
+      </div>
+      <div class="card">
+        <h3 id="teacher-form-title">Add Teacher</h3>
+        <form id="teacher-form" class="form-grid">
+          <label>Username <input id="tc-username" type="text" required></label>
+          <label>Password <input id="tc-password" type="password" required placeholder="Leave blank when editing to keep current"></label>
+          <label>Full Name <input id="tc-name" type="text" required></label>
+          <fieldset class="course-checks"><legend>Courses taught</legend><div id="tc-courses"></div></fieldset>
+          <div class="btn-row">
+            <button class="btn btn-primary" type="submit" id="tc-submit">Save Teacher</button>
+            <button class="btn hidden" type="button" id="tc-cancel">Cancel Edit</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>

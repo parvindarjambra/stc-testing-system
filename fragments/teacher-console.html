@@ -1,0 +1,55 @@
+<span class="section-label">Teacher Console</span>
+<h2 class="page-title">Teacher Portal</h2>
+<p id="teacher-welcome" class="muted"></p>
+
+<div class="console-layout">
+  <aside class="sidebar">
+    <button class="tab active" type="button" data-tpanel="queue">Grading Queue</button>
+    <button class="tab" type="button" data-tpanel="days">My Day Sheet (7:30 PM)</button>
+  </aside>
+  <div class="console-main">
+    <div id="t-panel-queue">
+    <div class="card">
+      <h3>My Submissions — Grading Queue</h3>
+      <div class="filters">
+        <label>Date <input id="tq-date" type="date"></label>
+        <label>Status
+          <select id="tq-status">
+            <option value="">All</option>
+            <option value="submitted">Submitted</option>
+            <option value="graded">Graded</option>
+            <option value="sent_to_admin">Sent to Admin</option>
+            <option value="final">Final</option>
+          </select>
+        </label>
+        <button class="btn" type="button" id="tq-refresh">Refresh</button>
+        <button class="btn btn-primary" type="button" id="tq-bulk-send">Send All Graded (Today)</button>
+      </div>
+      <div id="teacher-queue" class="table-wrap"></div>
+    </div>
+
+
+    <!-- Grading screen (shown when a row is opened) -->
+    <div id="grade-panel" class="card hidden">
+      <h3 id="grade-title">Grade Submission</h3>
+      <p id="grade-meta" class="muted"></p>
+      <div id="grade-body"></div>
+      <p class="grade-total">Total: <strong id="grade-total-text">—</strong></p>
+      <div class="btn-row">
+        <button class="btn btn-primary" type="button" id="grade-save">Save Grades</button>
+        <button class="btn btn-emerald" type="button" id="grade-send">Generate Result &amp; Send to Admin</button>
+        <button class="btn" type="button" id="grade-close">Close</button>
+      </div>
+    </div>
+
+    </div>
+    <div id="t-panel-days" class="hidden">
+    <div class="card">
+      <h3>My Day Sheet (7:30 PM)</h3>
+      <p class="muted">End-of-day consolidation sheets, filtered to your students.</p>
+      <div id="teacher-days" class="btn-row"></div>
+      <div id="teacher-daysheet" class="table-wrap"></div>
+    </div>
+    </div>
+  </div>
+</div>

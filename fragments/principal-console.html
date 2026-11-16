@@ -1,0 +1,53 @@
+    <span class="section-label">Principal Console</span>
+    <h2 class="page-title">Principal Portal — View Only</h2>
+    <p id="principal-welcome" class="muted"></p>
+
+    <div class="card">
+      <h3>Day Analytics — Participation per Shift (7 AM – 7 PM)</h3>
+      <div class="filters">
+        <label>Date <input id="pa-date" type="date"></label>
+        <button class="btn" type="button" id="pa-refresh">Refresh</button>
+        <button class="btn" type="button" id="pa-export">Export Day CSV</button>
+        <button class="btn" type="button" id="pa-print">Print Day Sheet</button>
+      </div>
+      <div id="pa-totals" class="stat-grid"></div>
+      <div id="pa-shifts"></div>
+      <h4>Per Course</h4>
+      <div id="pa-courses" class="table-wrap"></div>
+      <h4>Per Teacher</h4>
+      <div id="pa-teachers" class="table-wrap"></div>
+    </div>
+
+    <div class="card">
+      <h3>Month Analytics</h3>
+      <div class="filters">
+        <label>Month <input id="pm-month" type="month"></label>
+        <button class="btn" type="button" id="pm-refresh">Refresh</button>
+      </div>
+      <div id="pm-totals" class="stat-grid"></div>
+      <h4>Teacher Submissions (sent to Admin vs final)</h4>
+      <div id="pm-teachers" class="table-wrap"></div>
+      <h4>Course Averages</h4>
+      <div id="pm-courses" class="table-wrap"></div>
+    </div>
+
+    <div class="card">
+      <h3>Monthly Report</h3>
+      <div class="filters">
+        <label>Month <input id="pr-month" type="month"></label>
+        <button class="btn" type="button" id="pr-load">Load Report</button>
+        <button class="btn" type="button" id="pr-export">Export CSV</button>
+        <button class="btn" type="button" id="pr-print">Print</button>
+      </div>
+      <div id="principal-report" class="table-wrap"></div>
+    </div>
+
+    <div class="card">
+      <h3>Consolidation Day Sheets</h3>
+      <div id="pr-days" class="btn-row"></div>
+      <div id="pr-daysheet" class="table-wrap"></div>
+      <div class="btn-row">
+        <button class="btn hidden" type="button" id="pr-sheet-export">Export Sheet CSV</button>
+        <button class="btn hidden" type="button" id="pr-sheet-print">Print Sheet</button>
+      </div>
+    </div>

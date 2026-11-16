@@ -1,0 +1,385 @@
+# STC Testing System — Examination, Quiz & Result Management System
+
+**Version 1.3.2** — the code now lives on GitHub (https://github.com/parvindarjambra/stc-testing-system) with one-click updates: double-click `UPDATE.bat` on the Admin PC, no more ZIP downloads. Laptops need nothing installed — they just open the exam page in the browser (see §1b). Everything from v1.3.1 stays: renamed to **STC Testing System**; the real STC logo in every header (local file, offline); a "Back to Home" button on every portal page; teacher CSV import; fill-in-the-blank questions (teacher-graded, like theory); Admin course-wise results export to Excel (CSV) + printable course-wise result sheets. See TEST_REPORT.md for the full v1.3.2 note.
+
+**Super Sys-Tech Computers Centre, Umerkot** (also known as Super City Computer Center)
+*"Empowering Skills Since 1997"*
+
+- **Established:** 1997 by Sham Kumar Lohana (Director)
+- **Principal:** Ramesh Kumar
+- **Admin / Exam Controller:** Danish Mustafa (Academic Administrator)
+- **Address:** 1st Floor, Jameel Market, Umerkot, Sindh, Pakistan
+- **Phones:** 0332-3350790, 0345-3279790 · **Email:** info@stc.edu.pk · **Website:** stc.edu.pk
+- **Affiliations:** NAVTTC Islamabad, STEVTA Sindh, SBTE Sindh, TTB Sindh
+
+A complete **offline-first** exam system for the centre's LAN. It runs on the main
+Admin PC — no internet needed during classes. Students take daily quizzes and monthly
+tests on shared laptops, teachers grade theory answers, and Admin compiles the official
+monthly report. Every day at **7:30 PM** the system consolidates the whole day's results
+across all 11 shifts into one locked master sheet.
+
+---
+
+## 1. Quick start (Admin PC, Windows)
+
+**One-time setup**
+
+1. Install **Node.js LTS** (once): download from https://nodejs.org (the LTS `.msi`),
+   run it, accept the defaults, restart the PC. No other software is needed —
+   there are no npm packages to install.
+2. Unzip this folder anywhere, e.g. `C:\STC-Exam-System\`.
+3. Double-click **`START.bat`**.
+   - It checks Node.js, starts the server, and shows this PC's IP addresses.
+   - Leave the black window open all day. To stop the server, press `Ctrl+C` in it.
+
+**Laptops / phones on the same Wi-Fi or LAN**
+
+Open a browser and go to `http://<Admin-PC-IP>:3000`, e.g. `http://192.168.1.10:3000`.
+On the Admin PC itself you can also use `http://localhost:3000`.
+
+That address opens the landing page with 4 entry buttons. Each portal also has
+its own direct address — bookmark the ones you need:
+
+| Portal | Address | Login |
+|---|---|---|
+| Landing (entry buttons only) | `http://<IP>:3000/` | — |
+| Student Exam | `http://<IP>:3000/student` | Roll Number only (no password) |
+| Teacher | `http://<IP>:3000/teacher` | Teacher username + password |
+| Admin / Exam Controller | `http://<IP>:3000/admin` | Admin username + password |
+| Principal | `http://<IP>:3000/principal` | Principal username + password |
+
+Each portal is separate: it has its own login screen, and inside a portal there
+are no links to the other portals — only a **"← Back to Home"** button that
+returns to the landing page. A teacher's login will not open the Admin
+portal (and vice versa) — each login screen only accepts its own role, and shows
+a small hint with that portal's demo logins.
+
+> **First run:** the system creates its database automatically in the `data/` folder
+> and loads only the real institute data (Principal, Admin, 14 teachers,
+> 7 courses). Students and tests start empty — Admin adds them (see §2).
+> No setup step is needed.
+
+---
+
+## 1b. Daily use + updates (no more ZIP downloads)
+
+**Daily use — laptops need nothing installed.**
+Only the Admin PC runs the server: double-click `START.bat` once in the morning
+and leave the black window open. Every other laptop just opens the browser and
+goes to `http://<Admin-PC-IP>:3000` — no software, no START click, no ZIP on the
+laptops. For one-click opening, copy the `STC-Testing-System.url` shortcut file
+to each laptop's Desktop. Edit it once first: right-click → Properties →
+replace `ADMIN-PC-IP` with the Admin PC's IP address (shown by `START.bat`),
+and `:3000` with `:3001` if the server runs on port 3001. Double-clicking the
+shortcut opens the exam page. (Your edited shortcut is never overwritten by
+updates — keep it on the laptops.)
+
+**Updating — one double-click, no ZIP downloads.**
+The code lives on GitHub: https://github.com/parvindarjambra/stc-testing-system
+(public repo). When a new version is ready:
+1. Close the black server window on the Admin PC.
+2. Double-click **`UPDATE.bat`** — it downloads the latest code from GitHub and
+   copies it over this folder. Your `data/` folder (students, tests, results)
+   is never touched.
+3. Double-click **`START.bat`** again. Done — the footer shows the new version.
+
+**First install on a new PC.**
+Download the repo ZIP from the GitHub link above (Code → Download ZIP),
+extract it, double-click `UPDATE.bat` once (it restores the logo image file),
+then double-click `START.bat`.
+
+**Security note — LAN only.**
+This system is built for the centre's own Wi-Fi/LAN. The default demo logins
+(`admin` / `admin123`, teachers firstname / `teacher123`) are in the public
+repo, so never expose the server to the internet (no port forwarding, no public
+hosting). Inside the centre's LAN it is safe.
+
+**macOS / Linux:** run `./start.sh` instead of `START.bat`.
+
+**Change the port:** set the `PORT` environment variable before starting
+(e.g. `set PORT=8080` then run `START.bat`), or edit the `set PORT=3000` line in
+`START.bat`. If port 3000 is already in use on the PC, `START.bat` detects it
+automatically and falls back to port 3001 (all printed URLs then use 3001).
+
+---
+
+## 2. Demo logins (change these in the Admin portal after setup)
+
+| Role | Username | Password | Person |
+|---|---|---|---|
+| Principal | `principal` | `principal123` | Ramesh Kumar |
+| Admin / Exam Controller | `admin` | `admin123` | Danish Mustafa |
+| Teacher | `suneel` | `teacher123` | Suneel Kumar — Web Development |
+| Teacher | `mukesh` | `teacher123` | Mukesh Kumar — Web Development |
+| Teacher | `chatar` | `teacher123` | Chatar Khatri — Graphic Designing |
+| Teacher | `kelash` | `teacher123` | Kelash Kumar — DIT, CIT, One Year Compulsory |
+| Teacher | `ashok` | `teacher123` | Ashok Kumar — DIT, CIT, One Year Compulsory |
+| Teacher | `mahaveer` | `teacher123` | Mahaveer Singh — DIT, CIT, One Year Compulsory |
+| Teacher | `qurban` | `teacher123` | Qurban Ali — DIT, CIT, One Year Compulsory |
+| Teacher | `ramchand` | `teacher123` | Ramchand Rathore — DIT, CIT, One Year Compulsory |
+| Teacher | `sooraj` | `teacher123` | Sooraj Kumar — DIT, CIT, One Year Compulsory |
+| Teacher | `afzal` | `teacher123` | Muhammad Afzal — DIT, CIT, One Year Compulsory |
+| Teacher | `faiz` | `teacher123` | Faiz Muhammad — DIT, CIT, One Year Compulsory |
+| Teacher | `ghansham` | `teacher123` | Ghansham Kachhi — DIT, CIT, One Year Compulsory |
+| Teacher | `pawan` | `teacher123` | Pawan — DIT, CIT, One Year Compulsory |
+| Teacher | `kapil` | `teacher123` | Kapil — DIT, CIT, One Year Compulsory |
+
+Students do **not** log in — they just type their Roll Number on the Student Exam
+screen (`/student`). The roll number **must be in Admin's student list**
+(see §6): if it is not found, the student sees *"Ye roll number list mein nahi
+hai — Admin se rabta karein"* and cannot enter any test. If it is found, the
+registered name, father's name, course, shift and assigned teacher are shown
+**read-only** (the student cannot change them) — the student confirms and picks
+a test. There is no manual-details entry: **import your real student lists
+first** (Admin → Students → Import CSV), or students cannot take tests.
+The system ships with **no students and no tests** — the Students and Tests
+lists start empty, and Admin adds the real data. First-run flow: Admin logs
+in → adds students (Add Student, or Import CSV with the provided template)
+→ creates the month's test fresh (Tests → Create Test). There is no dummy
+or demo data anywhere in the system.
+
+**Notes on names (from the official STC website):**
+- The website lists "Ghansham Kachhi" as Hardware Incharge — he is seeded here as
+  Computer Instructor "Ghansham Kachhi" (very likely the same person now also
+  teaching). If it is a different Ghansham, Admin can rename him in the portal.
+- "Pawan" and "Kapil" were given without surnames — Admin can edit their full
+  names later in the Admin → Teachers section.
+- The STC website lists "Ramesh Kumar" twice (Principal AND Vice-Principal) and
+  "Sooraj Kumar" twice (Computer Instructor AND Watchman) — this looks like a
+  website data quirk. The system uses Principal Ramesh Kumar and Instructor
+  Sooraj Kumar.
+- Two former listings, Dileep Kumar and Nadir Ali, were removed at the centre's
+  request and have no logins.
+
+---
+
+## 3. Daily routine (7:00 AM – 7:30 PM)
+
+| Time | What happens |
+|---|---|
+| Before 7:00 AM | Admin starts the server (`START.bat`) and checks the dashboard. |
+| 7:00 AM – 7:00 PM | 11 one-hour shifts run (see below). Students open the Student Exam portal (`/student`), type their Roll Number (it must be on Admin's list), pick their test, and submit. After every submission the screen resets itself automatically, so the laptop is immediately ready for the next shift's student — no login conflicts. |
+| During the day | Teachers log in at `/teacher`, grade theory and fill-in-the-blank answers, and click **Generate Result & Send to Admin**. |
+| 7:30 PM | The system **automatically** compiles the whole day's master record (all shifts, all laptops) and locks it. Admin can also press the **"7:30 PM End-of-Day Consolidation & Sync"** button any time — running it again is safe, it never duplicates rows. The locked day sheet is then visible to Admin, Principal, and each teacher (their own students only). |
+| End of month | Admin opens **Monthly Report**, picks the month, reviews the compiled results, and exports/prints the Official Monthly Test & Progress Report. |
+
+**Shifts (11):** 07:00–08:00, 08:00–09:00, 09:00–10:00, 10:00–11:00, 11:00–12:00,
+12:00–13:00, 14:00–15:00, 15:00–16:00, 16:00–17:00, 17:00–18:00, 18:00–19:00.
+(13:00–14:00 is lunch — no shift.)
+
+**Courses (7):** DIT, CIT, One Year Compulsory, Web Development, E-commerce,
+Graphic Designing, Digital Marketing. Admin can add or rename courses.
+
+> **E-commerce & Digital Marketing currently have no assigned teacher.** Both
+> courses stay in the system. If a student picks one of them, the teacher
+> dropdown shows all Computer Instructors as a fallback (with a note), so the
+> flow never dead-ends. Admin can assign a subject teacher anytime in
+> Admin → Teachers.
+
+---
+
+## 4. The four portals
+
+Each portal is a **separate page with its own address and its own login
+screen**. Until login succeeds, a portal shows *only* its login form — no
+console, no buttons, no data. Each portal has only its own Logout, which
+returns to that portal's login screen. There are no links between portals
+inside any portal — only a "← Back to Home" button that returns to the
+landing page (on the login screen and inside the console).
+
+**Student Exam Portal — `/student` (no login, Roll Number only)**
+Roll Number check against Admin's list → registered details shown read-only →
+confirm → test picker → exam screen with live countdown timer, question
+palette, auto-submit on timeout. MCQs are auto-graded from the Admin's answer
+key; theory and fill-in-the-blank answers go to the teacher for marking.
+After submitting, the screen shows the MCQ score, then clears the
+session immediately for the next student. A roll number that is not on the
+list cannot enter any test (see §2, §6).
+
+**Teacher Portal — `/teacher` (login)**
+Each teacher sees **only** their own assigned students (enforced by the
+server). Side-by-side grading (student answer vs. model answer / suggested
+answer + max marks) for theory and fill-in-the-blank questions, per-question
+marks, auto-computed total, then **Generate Result &
+Send to Admin** (single or bulk for the day). Teachers can also view their own
+7:30 PM day sheet.
+
+**Admin / Exam Controller Portal — `/admin` (login)**
+Sidebar: Dashboard, Students, Tests, Results, Monthly Reports, 7:30 PM
+Consolidation, Courses, Teachers. Live shift monitor, Students (add/edit +
+Excel/CSV bulk import), Test & Quiz Builder (MCQs + Fill in the Blank +
+Theory, timer, randomize order, **month** for monthly tests), review
+teacher-submitted results, Finalize, Monthly Report, course-wise results
+export to Excel (CSV) + printable course-wise result sheets, and the 7:30 PM
+Consolidation button + history. Teachers can also be bulk-imported from CSV
+(Admin → Teachers → Import CSV).
+
+**Principal Portal — `/principal` (separate login, read-only)**
+Full-day and monthly analytics across all shifts, courses and teachers;
+participation per shift; teacher-submitted vs. final Admin results; export and
+print official institute result sheets (with institute header, affiliations,
+and signature lines for Director, Principal and Exam Controller).
+
+---
+
+## 5. Monthly tests — how the month works
+
+Admin creates a **fresh test every month** in the Test Builder. Monthly tests
+have a **Month** field (e.g. November 2026); daily quizzes do not. The Monthly
+Report compiles by the selected month: it includes only that month's monthly
+tests (status: sent to Admin or final) — daily quizzes are excluded. Pass mark
+is 40%.
+
+---
+
+## 6. Students: import, per-student teacher, template
+
+- **Bulk import:** Admin → Students → Import CSV. Use the downloadable
+  `students_template.csv` (columns: Roll Number, Student Name, Father's Name,
+  Course, Shift, Assigned Teacher). The importer handles quoted fields and
+  commas, skips duplicate roll numbers, and reports every bad row.
+  The Assigned Teacher column takes a teacher's **username or full name**
+  (e.g. `kelash` or `Kelash Kumar`); a name that matches no teacher rejects
+  that row with a clear error naming the row.
+- **Teacher import:** Admin → Teachers → Import CSV. Use the downloadable
+  `teachers_template.csv` (columns: Teacher Name, Course, Username, Password).
+  Username is optional (auto from the first name) and Password is optional
+  (default `teacher123`); several courses go in one cell separated by `;`.
+  A username that already exists rejects that row.
+- **Excel files:** the importer reads **CSV only**. In Excel, open your `.xlsx`
+  and use **File → Save As → CSV UTF-8** first, then import the `.csv`.
+- **Per-student teacher:** every student has their *own* assigned teacher (not
+  one teacher per class). Roll-number lookup fills that teacher in; the
+  details shown to the student are read-only — if anything is wrong, Admin
+  corrects it in the student list (Admin → Students → Edit). A teacher's
+  portal shows only their own students.
+- **Only listed roll numbers can take tests.** A student whose roll number is
+  not in the list is turned away at the Student Exam screen with a message to
+  contact Admin. There is no manual-details entry — keep the list up to date:
+  import the real class lists before the first test day.
+
+---
+
+## 7. Backup, moving PCs, and data safety
+
+- **Backup:** copy the whole `data/` folder (e.g. to a USB stick) at the end of
+  each day or week. That folder is the entire database.
+- **Restore / move to another PC:** install Node.js on the new PC, unzip this
+  system, copy your saved `data/` folder in, start `START.bat`. Everything
+  (students, tests, submissions, results) comes back.
+- Data is saved on every write and survives restarts and power cuts. The
+  server re-seeds the real accounts (Principal, Admin, teachers, courses)
+  **only** when the users collection is completely empty — it never deletes
+  or overwrites your students, tests or results.
+
+---
+
+## 8. FAQ
+
+**A laptop lost Wi-Fi during a test — is the result lost?**
+No. If the submit cannot reach the server, the laptop saves the submission in
+its browser ("Saved offline — will sync automatically") and retries every
+15 seconds, plus a **Sync now** button. When Wi-Fi returns, queued submissions
+upload automatically. Each submission has a unique id, so a retry can never
+create a duplicate. Do not close the browser tab until it shows "Synced".
+
+**A student submitted, but the next student sees the previous student's details?**
+That should not happen — the screen clears itself after every submission. If it
+ever does, press the browser's refresh (F5) — the start screen is always blank
+after a refresh.
+
+**How do I print / save a result sheet as PDF?**
+Open the report or day sheet, click **Print**, and in the print dialog choose
+"Save as PDF" (Chrome/Edge) or print to the printer. Print views include the
+institute header (with the real STC logo) and signature lines. For results
+grouped by course, use Admin → Monthly Report → **Print Course-wise Result
+Sheet**; for Excel, use **Export Results to Excel (CSV)** in the same place
+(or in Results, for the month of the selected date).
+
+**I forgot the Admin password.**
+Admin can reset teacher passwords in Admin → Teachers. If the Admin password
+itself is lost, stop the server, delete the `data/` folder contents, and start
+again — the system re-seeds with the demo logins above. **Warning: this erases
+all students, tests and results**, so only do it if you have a `data/` backup
+or are starting fresh.
+
+**The server window says "port 3000 in use".**
+Another copy of the server is already running (or another program uses port
+3000). `START.bat` handles this automatically: it switches to port 3001 and
+prints the 3001 addresses. If you start the server manually (`node server.js`),
+use `set PORT=3001 && node server.js` instead (see §1).
+
+**Laptops can't reach the page.**
+Check: (1) the Admin PC and laptops are on the same Wi-Fi/LAN; (2) you typed
+the Admin PC's current IP (shown by `START.bat` — it can change if the PC
+reconnects); (3) Windows Firewall allows Node.js — the first time you run
+`START.bat`, Windows may ask "Allow Node.js through the firewall?" — click
+**Allow**. If it was blocked, open Windows Defender Firewall → Allow an app →
+allow Node.js on Private networks.
+
+**Can students open the system from home / the internet?**
+No — by design. It only works on the centre's local network. That is what
+makes it work with zero internet.
+
+---
+
+## 9. How it is built (for the technically curious)
+
+- **Plain Node.js server, zero npm dependencies, no build step.** Only built-in
+  modules (`http`, `fs`, `path`, `crypto`). We deliberately did **not** use
+  Next.js: this system must start with a double-click on a Windows PC in a
+  rural centre and run fully offline — a single-file server with no install
+  step is the right call here.
+- **Database:** SQLite via `node:sqlite` when available (Node 22.5+), with an
+  automatic fallback to a file-backed JSON store (same interface) so it runs
+  on any Node 18+ with no build tools. Both live in `data/`.
+- **Frontend:** separate portal pages in `public/` (`index.html` landing,
+  `student.html`, `teacher.html`, `admin.html`, `principal.html`) with shared
+  `common.js` + one JS file per portal and one `style.css` — all CSS/JS/fonts
+  inline or local, **zero external requests** (no CDNs, no Google Fonts).
+  System font stack. The real STC logo (`public/stc-logo.webp`, a local
+  file) is shown in every header and on print sheets. The staff consoles live
+  in `fragments/` (outside `public/`) and are only sent to the browser after
+  a successful login, with the matching role — so an unauthenticated visitor
+  can never see console markup, even in the page source.
+- **Seed data (real only):** the 16 real user accounts (Principal, Admin,
+  14 teachers) and the 7 real courses. **No sample students and no sample
+  tests** — both lists start empty on first run; Admin adds real students
+  and creates each month's test fresh (see §2).
+
+## 10. Honest limits
+
+- **CSV import only** — `.xlsx` must be Saved-As CSV in Excel first (see §6).
+- **PDF via browser print** — there is no built-in PDF generator; use the
+  browser's Print → Save as PDF (see §8).
+- **Passwords** use salted SHA-256 hashing — adequate for a LAN-only demo
+  system, not bcrypt-grade. Keep the Admin PC itself physically secure and
+  change the demo passwords after setup.
+- **Plain HTTP on the LAN** (no HTTPS) — normal for a local-network system;
+  never expose this server directly to the internet.
+- **Login sessions live in server memory** — restarting the server logs
+  everyone out (they just log in again; no data is lost).
+- **7:30 PM auto-consolidation uses the Admin PC's clock** — keep the PC's
+  date/time correct, and keep the server running until after 7:30 PM.
+- **Pass mark is fixed at 40%** and grading is per-submission (one test at a
+  time); there is no automatic SMS/WhatsApp result delivery.
+
+## 11. Files in this package
+
+| File | What it is |
+|---|---|
+| `START.bat` / `start.sh` | Double-click launchers (Windows / macOS+Linux) |
+| `server.js` | The whole server (single file, commented) |
+| `seed.js` | Demo data (re-runnable, never duplicates) |
+| `e2e-test.js` | End-to-end verification script (see TEST_REPORT.md) |
+| `public/` | The web app: 5 portal pages (`index.html`, `student.html`, `teacher.html`, `admin.html`, `principal.html`), 6 JS files (`common.js` + one per portal), `style.css`, `stc-logo.webp` (real STC logo), `students_template.csv`, `teachers_template.csv` |
+| `fragments/` | Staff console markup (teacher/admin/principal) — served only after login with the matching role |
+| `students_template.csv` | Sample student import file (also downloadable in Admin) |
+| `teachers_template.csv` | Sample teacher import file (also downloadable in Admin) |
+| `data/` | The database (created on first run; back this up) |
+| `README.md` | This file |
+| `TEST_REPORT.md` | Verification results |
+
+**Re-verify after any change:** stop the server, delete `data/stc.sqlite`
+(or `data/*.json`), start on a test port (`PORT=3102 node server.js`), then
+run `node e2e-test.js http://127.0.0.1:3102`. It should report 205 PASS, 0 FAIL.
