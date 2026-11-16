@@ -27,8 +27,8 @@ echo    http://YOUR-PC-IP:%PORT%
 echo    Example: http://192.168.1.10:%PORT%
 echo  On THIS PC open:  http://localhost:%PORT%
 echo.
-echo  Keep this window open all day, 7:00 AM to 7:30 PM.
-echo  At 7:30 PM the system auto-consolidates the day results.
+echo  Keep this window open while tests are running.
+echo  Admin runs Day Consolidation any time - evening or next morning.
 echo  To stop the server, press Ctrl+C in this window.
 echo.
 node server.js

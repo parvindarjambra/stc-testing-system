@@ -150,7 +150,7 @@ async function bulkSendToday() {
   } catch (e) { toast('Bulk send failed: ' + e.message, false); }
 }
 
-/* Teacher day sheets (7:30 PM consolidation, filtered to own students). */
+/* Teacher day sheets (day consolidation, filtered to own students). */
 async function loadTeacherDays() {
   const box = $('teacher-days');
   try {

@@ -1,4 +1,4 @@
-// STC Testing System — end-to-end verification script (v1.4.0: real logo,
+// STC Testing System — end-to-end verification script (v1.4.1: real logo,
 // back-to-home, teacher import, fill-in-the-blank, course-wise results).
 // Usage: 1) wipe the test DB:  rm -f data/stc.sqlite data/*.json
 //        2) start server:      PORT=3102 node server.js   (auto-seeds users/courses on first start)
@@ -67,7 +67,7 @@ async function main() {
   const h = await req('GET', '/api/health');
   check('health 200 + ok', h.status === 200 && h.json && h.json.ok === true, JSON.stringify(h.json));
   check('db backend reported', h.json && (h.json.db === 'sqlite' || h.json.db === 'json'), h.json && h.json.db);
-  check('version is 1.4.0', h.json && h.json.version === '1.4.0', h.json && h.json.version);
+  check('version is 1.4.1', h.json && h.json.version === '1.4.1', h.json && h.json.version);
   const home = await req('GET', '/');
   check('landing page serves institute name', home.status === 200 && home.text.includes('Super Sys-Tech Computers Centre'));
   check('landing page serves Principal name', home.text.includes('Ramesh Kumar'));
@@ -321,7 +321,7 @@ async function main() {
   const monA = await req('GET', '/api/analytics/month?month=2026-11', null, principal.token);
   check('principal month analytics load', monA.status === 200 && !!monA.json.perTeacher);
 
-  console.log('\n[12] 7:30 PM consolidation (manual trigger) + lock');
+  console.log('\n[12] Day Consolidation (manual trigger) + lock');
   const con1 = await req('POST', '/api/consolidation/run', { date: today }, admin.token);
   check('consolidation run -> 3 rows, locked', con1.json && con1.json.rows === 3 && con1.json.locked === true, JSON.stringify(con1.json));
   const con2 = await req('POST', '/api/consolidation/run', { date: today }, admin.token);
@@ -424,7 +424,7 @@ async function main() {
   check('admin fragment with teacher token -> 403', fragWrongRole.status === 403);
   const fragAdmin = await req('GET', '/fragments/admin-console.html', null, admin.token);
   check('admin fragment with admin token -> 200 + console markup',
-    fragAdmin.status === 200 && fragAdmin.text.includes('tab-dashboard') && fragAdmin.text.includes('7:30 PM Consolidation'));
+    fragAdmin.status === 200 && fragAdmin.text.includes('tab-dashboard') && fragAdmin.text.includes('Day Consolidation'));
   const fragTeacher = await req('GET', '/fragments/teacher-console.html', null, tokens.kelash.token);
   check('teacher fragment with teacher token -> 200 + queue markup',
     fragTeacher.status === 200 && fragTeacher.text.includes('teacher-queue'));
@@ -463,8 +463,8 @@ async function main() {
   check('teacher login hint lists all 14 teachers, no nadir/dileep',
     teaHtml.includes('ghansham') && teaHtml.includes('pawan') && teaHtml.includes('kapil') &&
     !teaHtml.includes('nadir') && !teaHtml.includes('dileep'));
-  check('admin console has sidebar with 7:30 PM Consolidation',
-    admFrag.includes('class="sidebar"') && admFrag.includes('7:30 PM Consolidation') && admFrag.includes('data-tab="consolidation"'));
+  check('admin console has sidebar with Day Consolidation',
+    admFrag.includes('class="sidebar"') && admFrag.includes('Day Consolidation') && admFrag.includes('data-tab="consolidation"'));
   check('teacher console has sidebar (queue / day sheet)',
     teaFrag.includes('class="sidebar"') && teaFrag.includes('data-tpanel="queue"') && teaFrag.includes('data-tpanel="days"'));
   check('role-enforced login in common.js (wrong_role message)',

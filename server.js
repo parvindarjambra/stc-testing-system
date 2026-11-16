@@ -22,7 +22,7 @@ const crypto = require('crypto');
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = '0.0.0.0';
-const VERSION = '1.4.0';
+const VERSION = '1.4.1';
 const ROOT = __dirname;
 const DATA_DIR = path.join(ROOT, 'data');
 const PUBLIC_DIR = path.join(ROOT, 'public');
@@ -245,7 +245,6 @@ function parseCsv(text) {
 function createApp(store) {
   // Sessions live in memory only: token -> userId (restart = re-login, acceptable).
   const sessions = new Map();
-  let lastAutoDate = null; // guard so the 19:30 auto-consolidation fires once per day
 
   // --- auth helpers ---------------------------------------------------------
   function userFromRequest(req) {
@@ -1316,27 +1315,7 @@ function createApp(store) {
     }
   }
 
-  // --- 19:30 auto-consolidation scheduler ------------------------------------
-  function startScheduler() {
-    setInterval(() => {
-      try {
-        const now = new Date();
-        if (now.getHours() === 19 && now.getMinutes() === 30) {
-          const date = todayStr(now);
-          if (lastAutoDate === date) return;
-          lastAutoDate = date;
-          if (!store.findOne('consolidations', (c) => c.date === date)) {
-            const result = runConsolidation(date);
-            console.log('[scheduler] 19:30 auto-consolidation for ' + date + ': ' + result.rows + ' rows');
-          }
-        }
-      } catch (e) {
-        console.error('[scheduler] error:', e);
-      }
-    }, 60 * 1000);
-  }
-
-  return { handle, runConsolidation, startScheduler, sessions };
+  return { handle, runConsolidation, sessions };
 }
 
 module.exports.createApp = createApp;
@@ -1356,7 +1335,5 @@ if (require.main === module) {
   const server = http.createServer((req, res) => app.handle(req, res));
   server.listen(PORT, HOST, () => {
     console.log('[stc] STC Testing System listening on http://' + HOST + ':' + PORT);
-    console.log('[stc] 19:30 auto-consolidation scheduler active.');
   });
-  app.startScheduler();
 }

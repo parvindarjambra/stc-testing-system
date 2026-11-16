@@ -1,6 +1,6 @@
 # STC Testing System — Examination, Quiz & Result Management System
 
-**Version 1.4.0** — **USB sync for offline labs**: labs with no network at all get a standalone lab app (`STC-Lab.html`) — students test fully offline, and submissions come back on a USB stick for Admin to import (see §1c). Everything from v1.3.2 stays: the code lives on GitHub (https://github.com/parvindarjambra/stc-testing-system) with one-click updates (double-click `UPDATE.bat` on the Admin PC, no more ZIP downloads); laptops on the LAN need nothing installed — they just open the exam page in the browser (see §1b). Renamed to **STC Testing System**; the real STC logo in every header (local file, offline); a "Back to Home" button on every portal page; teacher CSV import; fill-in-the-blank questions (teacher-graded, like theory); Admin course-wise results export to Excel (CSV) + printable course-wise result sheets. See TEST_REPORT.md for the full v1.4.0 note.
+**Version 1.4.1** — **No fixed consolidation time**: the 7:30 PM auto-consolidation is removed; Admin runs **Day Consolidation** any time — same evening or next morning — picking the date. **USB sync for offline labs** (v1.4.0): labs with no network at all get a standalone lab app (`STC-Lab.html`) — students test fully offline, and submissions come back on a USB stick for Admin to import (see §1c). Everything from v1.3.2 stays: the code lives on GitHub (https://github.com/parvindarjambra/stc-testing-system) with one-click updates (double-click `UPDATE.bat` on the Admin PC, no more ZIP downloads); laptops on the LAN need nothing installed — they just open the exam page in the browser (see §1b). Renamed to **STC Testing System**; the real STC logo in every header (local file, offline); a "Back to Home" button on every portal page; teacher CSV import; fill-in-the-blank questions (teacher-graded, like theory); Admin course-wise results export to Excel (CSV) + printable course-wise result sheets. See TEST_REPORT.md for the full v1.4.1 note.
 
 **Super Sys-Tech Computers Centre, Umerkot** (also known as Super City Computer Center)
 *"Empowering Skills Since 1997"*
@@ -15,7 +15,8 @@
 A complete **offline-first** exam system for the centre's LAN. It runs on the main
 Admin PC — no internet needed during classes. Students take daily quizzes and monthly
 tests on shared laptops, teachers grade theory answers, and Admin compiles the official
-monthly report. Every day at **7:30 PM** the system consolidates the whole day's results
+monthly report. Whenever Admin is ready — same evening or next morning —
+Admin runs **Day Consolidation**, which compiles the whole day's results
 across all 11 shifts into one locked master sheet.
 
 ---
@@ -141,7 +142,7 @@ moves only on a USB stick.
 - Only clear a laptop's saved submissions (**Clear saved** button) AFTER
   Admin has confirmed the import worked — deleted submissions cannot be
   recovered.
-- If you import after running the 7:30 PM consolidation for that date,
+- If you import after running the Day Consolidation for that date,
   re-run the consolidation for that date so the new rows join the day sheet
   (re-running is safe — it never duplicates rows).
 
@@ -197,14 +198,14 @@ or demo data anywhere in the system.
 
 ---
 
-## 3. Daily routine (7:00 AM – 7:30 PM)
+## 3. Daily routine
 
 | Time | What happens |
 |---|---|
 | Before 7:00 AM | Admin starts the server (`START.bat`) and checks the dashboard. |
 | 7:00 AM – 7:00 PM | 11 one-hour shifts run (see below). Students open the Student Exam portal (`/student`), type their Roll Number (it must be on Admin's list), pick their test, and submit. After every submission the screen resets itself automatically, so the laptop is immediately ready for the next shift's student — no login conflicts. |
 | During the day | Teachers log in at `/teacher`, grade theory and fill-in-the-blank answers, and click **Generate Result & Send to Admin**. |
-| 7:30 PM | The system **automatically** compiles the whole day's master record (all shifts, all laptops) and locks it. Admin can also press the **"7:30 PM End-of-Day Consolidation & Sync"** button any time — running it again is safe, it never duplicates rows. The locked day sheet is then visible to Admin, Principal, and each teacher (their own students only). |
+| Evening or next morning | Admin opens **Day Consolidation**, picks the date, and presses **Run Day Consolidation & Sync** — the system compiles the whole day's master record (all shifts, all laptops) and locks it. Running it again is safe, it never duplicates rows. The locked day sheet is then visible to Admin, Principal, and each teacher (their own students only). |
 | End of month | Admin opens **Monthly Report**, picks the month, reviews the compiled results, and exports/prints the Official Monthly Test & Progress Report. |
 
 **Shifts (11):** 07:00–08:00, 08:00–09:00, 09:00–10:00, 10:00–11:00, 11:00–12:00,
@@ -246,15 +247,15 @@ server). Side-by-side grading (student answer vs. model answer / suggested
 answer + max marks) for theory and fill-in-the-blank questions, per-question
 marks, auto-computed total, then **Generate Result &
 Send to Admin** (single or bulk for the day). Teachers can also view their own
-7:30 PM day sheet.
+Day Consolidation sheet.
 
 **Admin / Exam Controller Portal — `/admin` (login)**
-Sidebar: Dashboard, Students, Tests, Results, Monthly Reports, 7:30 PM
+Sidebar: Dashboard, Students, Tests, Results, Monthly Reports, Day
 Consolidation, Courses, Teachers. Live shift monitor, Students (add/edit +
 Excel/CSV bulk import), Test & Quiz Builder (MCQs + Fill in the Blank +
 Theory, timer, randomize order, **month** for monthly tests), review
 teacher-submitted results, Finalize, Monthly Report, course-wise results
-export to Excel (CSV) + printable course-wise result sheets, and the 7:30 PM
+export to Excel (CSV) + printable course-wise result sheets, and the Day
 Consolidation button + history. Teachers can also be bulk-imported from CSV
 (Admin → Teachers → Import CSV).
 
@@ -403,8 +404,6 @@ makes it work with zero internet.
   never expose this server directly to the internet.
 - **Login sessions live in server memory** — restarting the server logs
   everyone out (they just log in again; no data is lost).
-- **7:30 PM auto-consolidation uses the Admin PC's clock** — keep the PC's
-  date/time correct, and keep the server running until after 7:30 PM.
 - **Pass mark is fixed at 40%** and grading is per-submission (one test at a
   time); there is no automatic SMS/WhatsApp result delivery.
 

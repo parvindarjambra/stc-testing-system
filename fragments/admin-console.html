@@ -9,7 +9,7 @@
     <button class="tab" type="button" data-tab="tests">Tests</button>
     <button class="tab" type="button" data-tab="results">Results</button>
     <button class="tab" type="button" data-tab="monthly">Monthly Reports</button>
-    <button class="tab" type="button" data-tab="consolidation">7:30 PM Consolidation</button>
+    <button class="tab" type="button" data-tab="consolidation">Day Consolidation</button>
     <button class="tab" type="button" data-tab="labsync">USB Lab Sync</button>
     <button class="tab" type="button" data-tab="courses">Courses</button>
     <button class="tab" type="button" data-tab="teachers">Teachers</button>
@@ -172,11 +172,11 @@
     <!-- Consolidation -->
     <div id="tab-consolidation" class="tab-panel hidden">
       <div class="card highlight-card">
-        <h3>7:30 PM End-of-Day Consolidation &amp; Sync</h3>
-        <p class="muted">Compiles every submission for the day into one locked master sheet. This also runs automatically at 7:30 PM. Safe to run again — it never duplicates rows.</p>
+        <h3>Day Consolidation &amp; Sync</h3>
+        <p class="muted">Compiles every submission for the day into one locked master sheet. Run it any time — same evening or next morning. Safe to run again — it never duplicates rows.</p>
         <div class="filters">
           <label>Date <input id="con-date" type="date"></label>
-          <button class="btn btn-emerald btn-big" type="button" id="con-run">Run 7:30 PM Consolidation &amp; Sync</button>
+          <button class="btn btn-emerald btn-big" type="button" id="con-run">Run Day Consolidation &amp; Sync</button>
         </div>
         <p id="con-run-result" class="con-result"></p>
       </div>

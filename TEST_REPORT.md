@@ -454,3 +454,22 @@ monthly report): 51 PASS, 0 FAIL. Headless-Chromium smoke test of the REAL
 exported STC-Lab.html (CDP-driven): roll verify incl. unknown-roll
 rejection, full exam, localStorage save, Export download verified as a
 valid envelope, Clear: 22 PASS, 0 FAIL. Version bumped to 1.4.0.
+
+## v1.4.1 (2026-11-16) — No fixed consolidation time
+User order: 7:30 PM is not mandatory — consolidation can also run the next
+morning; no fixed time at all ("time nhi laghoo"). Change: the 19:30
+auto-consolidation scheduler is REMOVED from server.js (startScheduler,
+lastAutoDate guard, startup log line all deleted — the server log no longer
+mentions any auto-consolidation). Consolidation is now manual-only: Admin
+opens the renamed **Day Consolidation** tab, picks the date (today or any
+past date — the date picker and the /api/consolidation/run date parameter
+already supported this), and presses **Run Day Consolidation & Sync**.
+All "7:30 PM" labels renamed: Admin tab/heading/button, teacher "My Day
+Sheet", START.bat text, README daily-routine table (row is now "Evening or
+next morning"). Re-running for a date stays safe (idempotent upsert, never
+duplicates). No other behaviour changed.
+Tests: existing E2E still 205 PASS, 0 FAIL; e2e-sync-test.js still 51 PASS,
+0 FAIL. Extra live check: POST /api/consolidation/run with yesterday's date
+(2026-11-15) returned 200 {"ok":true,"date":"2026-11-15","rows":0,
+"locked":true}; served admin fragment contains "Day Consolidation" (3x) and
+zero "7:30" matches. Version bumped to 1.4.1.
