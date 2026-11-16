@@ -1,6 +1,6 @@
 # STC Testing System — Examination, Quiz & Result Management System
 
-**Version 1.5.0** — **Modern redesign**: deep-navy sidebar console with brand block + icon tabs, pill badges for teachers/courses/shifts, refreshed landing hero and dark login screens — same flows, no feature changes. Wrong-roll message is now exactly 'Aapka Roll Number ghalat hai.' and the teacher button is 'Submit to Admin'. **Forgiving student CSV import** (v1.4.2, see §6): "Sir Ashok Kumar" now matches, unpadded "9:00 AM" shifts and lowercase courses ("cit" → "CIT") are accepted. **No fixed consolidation time** (v1.4.1): the 7:30 PM auto-consolidation is removed; Admin runs **Day Consolidation** any time — same evening or next morning — picking the date. **USB sync for offline labs** (v1.4.0): labs with no network at all get a standalone lab app (`STC-Lab.html`) — students test fully offline, and submissions come back on a USB stick for Admin to import (see §1c). Everything from v1.3.2 stays: the code lives on GitHub (https://github.com/parvindarjambra/stc-testing-system) with one-click updates (double-click `UPDATE.bat` on the Admin PC, no more ZIP downloads); laptops on the LAN need nothing installed — they just open the exam page in the browser (see §1b). Renamed to **STC Testing System**; the real STC logo in every header (local file, offline); a "Back to Home" button on every portal page; teacher CSV import; fill-in-the-blank questions (teacher-graded, like theory); Admin course-wise results export to Excel (CSV) + printable course-wise result sheets. See TEST_REPORT.md for the full v1.5.0 note.
+**Version 1.5.1** — **Home page is the Student Terminal**: `/` now shows ONLY the student roll-number terminal (same page as `/student`) — students never see the staff portals; staff log in from the single discreet **Staff / Faculty Login** menu at the top-right. **Modern redesign** (v1.5.0): deep-navy sidebar console with brand block + icon tabs, pill badges for teachers/courses/shifts, refreshed landing hero and dark login screens — same flows, no feature changes. Wrong-roll message is now exactly 'Aapka Roll Number ghalat hai.' and the teacher button is 'Submit to Admin'. **Forgiving student CSV import** (v1.4.2, see §6): "Sir Ashok Kumar" now matches, unpadded "9:00 AM" shifts and lowercase courses ("cit" → "CIT") are accepted. **No fixed consolidation time** (v1.4.1): the 7:30 PM auto-consolidation is removed; Admin runs **Day Consolidation** any time — same evening or next morning — picking the date. **USB sync for offline labs** (v1.4.0): labs with no network at all get a standalone lab app (`STC-Lab.html`) — students test fully offline, and submissions come back on a USB stick for Admin to import (see §1c). Everything from v1.3.2 stays: the code lives on GitHub (https://github.com/parvindarjambra/stc-testing-system) with one-click updates (double-click `UPDATE.bat` on the Admin PC, no more ZIP downloads); laptops on the LAN need nothing installed — they just open the exam page in the browser (see §1b). Renamed to **STC Testing System**; the real STC logo in every header (local file, offline); a "Back to Home" button on every staff portal page (the Student Terminal IS home); teacher CSV import; fill-in-the-blank questions (teacher-graded, like theory); Admin course-wise results export to Excel (CSV) + printable course-wise result sheets. See TEST_REPORT.md for the full v1.5.1 note.
 
 **Super Sys-Tech Computers Centre, Umerkot** (also known as Super City Computer Center)
 *"Empowering Skills Since 1997"*
@@ -38,20 +38,24 @@ across all 11 shifts into one locked master sheet.
 Open a browser and go to `http://<Admin-PC-IP>:3000`, e.g. `http://192.168.1.10:3000`.
 On the Admin PC itself you can also use `http://localhost:3000`.
 
-That address opens the landing page with 4 entry buttons. Each portal also has
-its own direct address — bookmark the ones you need:
+That address opens the Student Terminal — the roll-number check screen.
+Staff reach their portals from the **Staff / Faculty Login** menu at the
+top-right of the terminal. Each portal also has its own direct address —
+bookmark the ones you need:
 
 | Portal | Address | Login |
 |---|---|---|
-| Landing (entry buttons only) | `http://<IP>:3000/` | — |
-| Student Exam | `http://<IP>:3000/student` | Roll Number only (no password) |
+| Student Terminal (home) | `http://<IP>:3000/` | Roll Number only (no password) |
+| Student Exam | `http://<IP>:3000/student` | Same terminal page |
 | Teacher | `http://<IP>:3000/teacher` | Teacher username + password |
 | Admin / Exam Controller | `http://<IP>:3000/admin` | Admin username + password |
 | Principal | `http://<IP>:3000/principal` | Principal username + password |
 
-Each portal is separate: it has its own login screen, and inside a portal there
-are no links to the other portals — only a **"← Back to Home"** button that
-returns to the landing page. A teacher's login will not open the Admin
+Each staff portal is separate: it has its own login screen, and inside a
+portal there are no links to the other portals — only a **"← Back to Home"**
+button that returns to the Student Terminal. The terminal itself shows no
+portals at all — only the roll-number check and the staff menu. A teacher's
+login will not open the Admin
 portal (and vice versa) — each login screen only accepts its own role, and shows
 a small hint with that portal's demo logins.
 
@@ -203,7 +207,7 @@ or demo data anywhere in the system.
 | Time | What happens |
 |---|---|
 | Before 7:00 AM | Admin starts the server (`START.bat`) and checks the dashboard. |
-| 7:00 AM – 7:00 PM | 11 one-hour shifts run (see below). Students open the Student Exam portal (`/student`), type their Roll Number (it must be on Admin's list), pick their test, and submit. After every submission the screen resets itself automatically, so the laptop is immediately ready for the next shift's student — no login conflicts. |
+| 7:00 AM – 7:00 PM | 11 one-hour shifts run (see below). Students open the home page — the Student Terminal (`/`, same as `/student`), type their Roll Number (it must be on Admin's list), pick their test, and submit. After every submission the screen resets itself automatically, so the laptop is immediately ready for the next shift's student — no login conflicts. |
 | During the day | Teachers log in at `/teacher`, grade theory and fill-in-the-blank answers, and click **Submit to Admin**. |
 | Evening or next morning | Admin opens **Day Consolidation**, picks the date, and presses **Run Day Consolidation & Sync** — the system compiles the whole day's master record (all shifts, all laptops) and locks it. Running it again is safe, it never duplicates rows. The locked day sheet is then visible to Admin, Principal, and each teacher (their own students only). |
 | End of month | Admin opens **Monthly Report**, picks the month, reviews the compiled results, and exports/prints the Official Monthly Test & Progress Report. |
@@ -225,14 +229,17 @@ Graphic Designing, Digital Marketing. Admin can add or rename courses.
 
 ## 4. The four portals
 
-Each portal is a **separate page with its own address and its own login
-screen**. Until login succeeds, a portal shows *only* its login form — no
-console, no buttons, no data. Each portal has only its own Logout, which
-returns to that portal's login screen. There are no links between portals
-inside any portal — only a "← Back to Home" button that returns to the
-landing page (on the login screen and inside the console).
+The home page is the **Student Terminal** — students see only the
+roll-number check, never the staff portals. Each staff portal is a **separate
+page with its own address and its own login screen**, reached from the
+terminal's "Staff / Faculty Login" menu (top-right). Until login succeeds,
+a portal shows *only* its login form — no console, no buttons, no data.
+Each portal has only its own Logout, which returns to that portal's login
+screen. There are no links between portals inside any portal — only a
+"← Back to Home" button that returns to the Student Terminal (on the login
+screen and inside the console).
 
-**Student Exam Portal — `/student` (no login, Roll Number only)**
+**Student Exam Portal — `/` and `/student` (same terminal page; no login, Roll Number only)**
 Roll Number check against Admin's list → registered details shown read-only →
 confirm → test picker → exam screen with live countdown timer, question
 palette, auto-submit on timeout. MCQs are auto-graded from the Admin's answer

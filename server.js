@@ -22,7 +22,7 @@ const crypto = require('crypto');
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = '0.0.0.0';
-const VERSION = '1.5.0';
+const VERSION = '1.5.1';
 const ROOT = __dirname;
 const DATA_DIR = path.join(ROOT, 'data');
 const PUBLIC_DIR = path.join(ROOT, 'public');
@@ -1292,8 +1292,11 @@ function createApp(store) {
         return;
       }
       // Portal pages — separate URLs, separate files (no shared navigation).
+      // NOTE: '/' IS the Student Terminal (same file as /student) — students
+      // see only the roll-number terminal; staff portals live behind the
+      // "Staff / Faculty Login" menu on that page.
       const PORTAL_PAGES = {
-        '/': 'index.html',
+        '/': 'student.html',
         '/student': 'student.html',
         '/teacher': 'teacher.html',
         '/admin': 'admin.html',

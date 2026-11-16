@@ -366,7 +366,40 @@ function resetStudent() {
 /* ---------------- Student page init ---------------- */
 document.addEventListener('DOMContentLoaded', () => {
   initStudent();
+  initStaffMenu();
+  initTerminalVersion();
   $('btn-sync-now').addEventListener('click', () => flushQueue());
   updateQueueBadge();
   flushQueue();   // try to sync any queued submissions right away
 });
+
+/* Staff / Faculty Login dropdown (terminal header, top-right). The only
+   staff entry point on this page: Teacher, Admin, Principal. */
+function initStaffMenu() {
+  const btn = $('staff-menu-btn');
+  const menu = $('staff-menu-list');
+  if (!btn || !menu) return;
+  const close = () => {
+    menu.classList.add('hidden');
+    btn.setAttribute('aria-expanded', 'false');
+  };
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isHidden = menu.classList.toggle('hidden');
+    btn.setAttribute('aria-expanded', String(!isHidden));
+  });
+  document.addEventListener('click', (e) => {
+    if (!menu.classList.contains('hidden') && !menu.contains(e.target)) close();
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+}
+
+/* Tiny footer version line, filled from the server health endpoint. */
+function initTerminalVersion() {
+  const el = $('terminal-version');
+  if (!el) return;
+  fetch('/api/health')
+    .then((r) => r.json())
+    .then((h) => { el.textContent = 'STC Testing System v' + (h.version || ''); })
+    .catch(() => { /* leave the static fallback text */ });
+}

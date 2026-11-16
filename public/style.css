@@ -1,4 +1,4 @@
-/* STC Testing System v1.5.0 — modern redesign.
+/* STC Testing System v1.5.1 — home page is the Student Terminal.
    Clean, modern console design: deep-navy sidebar, soft layered shadows,
    rounded-2xl cards, pill badges, emerald→teal→cyan brand gradient.
    System fonts only, zero external assets (no remote libraries, no web
@@ -84,14 +84,6 @@ h1, h2, h3, h4, h5, h6 { letter-spacing: -0.02em; }
   border-radius: 9999px;
   user-select: none;
 }
-.text-gradient {
-  background: var(--grad-text);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
-}
-
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
@@ -187,82 +179,13 @@ main { max-width: 1160px; margin: 0 auto; padding: 26px 20px; }
 .card h4 { color: var(--navy2); margin: 20px 0 10px; }
 .highlight-card { border: 1.5px solid var(--emerald); background: #ECFDF5; }
 
-/* ---------- Hero (landing page) ---------- */
-.hero {
-  background-color: var(--navy-deep);
-  background-image:
-    radial-gradient(at 0% 0%, rgba(45, 212, 191, 0.20) 0px, transparent 55%),
-    radial-gradient(at 100% 0%, rgba(34, 211, 238, 0.16) 0px, transparent 50%),
-    radial-gradient(at 100% 100%, rgba(5, 150, 105, 0.20) 0px, transparent 55%);
-  border-radius: 1.5rem;
-  padding: 48px 42px 40px;
-  margin-bottom: 24px;
-  color: #fff;
-  box-shadow: 0 30px 60px -24px rgba(15, 23, 42, 0.55);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-.hero .section-label { background-color: rgba(245, 158, 11, 0.16); border-color: rgba(245, 158, 11, 0.35); color: #fcd34d; margin-bottom: 16px; }
-.hero-title {
-  margin: 0 0 12px;
-  font-size: 48px;
-  font-weight: 800;
-  line-height: 1.05;
-  letter-spacing: -0.03em;
-  color: #fff;
-}
-.hero-sub { margin: 0 0 24px; font-size: 17px; color: #cbd5e1; max-width: 640px; line-height: 1.6; }
-.hero-stats { display: flex; flex-wrap: wrap; gap: 10px; }
-.hero-chip {
-  display: inline-flex; align-items: center; gap: 7px;
-  background: rgba(255, 255, 255, 0.09);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  backdrop-filter: blur(12px);
-  border-radius: 9999px;
-  padding: 8px 15px;
-  font-size: 13px;
-  color: #e2e8f0;
-}
-.hero-chip strong { color: #fff; font-size: 15px; }
-.hero-health { margin: 20px 0 0; font-size: 13px; color: #94a3b8; }
-
-/* ---------- Landing portal cards ---------- */
-.portal-heading { color: var(--navy); font-size: 20px; font-weight: 800; margin: 6px 2px 0; letter-spacing: -0.02em; }
+/* ---------- Card grid (test picker) ---------- */
 .card-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 18px;
   margin-top: 16px;
 }
-.portal-card {
-  background: var(--card);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius);
-  padding: 28px 24px 24px;
-  text-align: left;
-  cursor: pointer;
-  display: flex; flex-direction: column; gap: 9px;
-  font-family: inherit;
-  box-shadow: var(--shadow-card);
-  transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
-}
-.portal-card:hover {
-  border-color: rgba(13, 148, 136, 0.45);
-  box-shadow: var(--shadow-lift);
-  transform: translateY(-4px);
-}
-.portal-icon {
-  width: 60px; height: 60px;
-  border-radius: 16px;
-  background: var(--grad-brand);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 28px;
-  box-shadow: 0 12px 26px -10px rgba(5, 150, 105, 0.6);
-  margin-bottom: 4px;
-}
-.portal-title { font-size: 19px; font-weight: 800; color: var(--navy); letter-spacing: -0.01em; }
-.portal-desc { font-size: 14px; color: var(--grey); line-height: 1.55; }
-.portal-arrow { font-size: 14px; font-weight: 700; color: var(--teal); margin-top: 6px; transition: transform 0.3s ease; }
-.portal-card:hover .portal-arrow { color: var(--cyan-deep); transform: translateX(3px); }
 
 /* ---------- Login ---------- */
 .login-card { max-width: 460px; padding: 34px 34px 28px; text-align: center; }
@@ -498,9 +421,6 @@ tr.clickable:hover td { background: #f0fdfa; }
   .header-inner { flex-direction: column; }
   .header-people { text-align: left; }
   .site-header h1 { font-size: 20px; }
-  .hero { padding: 30px 22px 26px; }
-  .hero-title { font-size: 32px; }
-  .hero-sub { font-size: 15px; }
   .card-grid { grid-template-columns: 1fr; }
   .form-grid { grid-template-columns: 1fr; }
   .grade-cols { grid-template-columns: 1fr; }
@@ -518,7 +438,7 @@ tr.clickable:hover td { background: #f0fdfa; }
 /* ---------- Print: only the sheet shows ---------- */
 @media print {
   body { background: #fff; }
-  .site-header, .topbar, #toast, #main { display: none !important; }
+  .site-header, .topbar, #toast, #main, .terminal-footer { display: none !important; }
   #print-area { display: block; color: #000; font-size: 13px; }
   #print-area table { font-size: 12px; }
   #print-area th { background: #eee !important; color: #000; }
@@ -536,7 +456,6 @@ tr.clickable:hover td { background: #f0fdfa; }
 .topbar-title { font-weight: 800; font-size: 15px; color: var(--navy); letter-spacing: -0.01em; }
 .login-error { color: var(--red); font-weight: 700; font-size: 14px; margin: 12px 0 0; text-align: center; }
 .lookup-msg.err { color: var(--red); }
-a.portal-card { text-decoration: none; color: inherit; }
 
 /* ---------- Console sidebar layout (admin / teacher) ---------- */
 .console-layout { display: flex; gap: 20px; align-items: flex-start; }
@@ -581,4 +500,106 @@ a.portal-card { text-decoration: none; color: inherit; }
   .sidebar-brand { margin-bottom: 8px; }
   .sidebar .tab { width: auto; margin-bottom: 0; white-space: nowrap; }
   .sidebar-tabs-scroll { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
+}
+
+/* ---------- Student Terminal (home page: / and /student) ---------- */
+/* Dark navy full page. Students see ONLY the roll-number terminal here;
+   staff portals live behind the single "Staff / Faculty Login" menu. */
+body.terminal-mode {
+  background-color: #0a0f1e;
+  background-image:
+    radial-gradient(at 0% 0%, rgba(45, 212, 191, 0.13) 0px, transparent 55%),
+    radial-gradient(at 100% 100%, rgba(34, 211, 238, 0.11) 0px, transparent 55%);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+body.terminal-mode main { flex: 1; width: 100%; }
+
+/* Slim terminal header: logo + institute name left, staff menu right. */
+.terminal-header { padding: 12px 20px; }
+.terminal-header .header-inner { align-items: center; }
+.terminal-header .header-logo-chip { width: 56px; height: 56px; flex-basis: 56px; border-radius: 14px; padding: 5px; }
+.terminal-header h1 { font-size: 20px; text-transform: uppercase; letter-spacing: 0.01em; }
+.terminal-header .tagline { color: #94a3b8; font-size: 12.5px; font-weight: 500; }
+.terminal-header-right { display: flex; gap: 10px; align-items: center; margin-left: auto; flex: 0 0 auto; }
+.terminal-header-right .queue-badge { white-space: nowrap; }
+
+/* The one staff entry point on the terminal: a small discreet pill button
+   with a dropdown (Teacher / Admin / Principal). */
+.staff-menu { position: relative; }
+.staff-btn {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #e2e8f0;
+  border-radius: 9999px;
+  padding: 8px 16px;
+  font-size: 13.5px; font-weight: 700; font-family: inherit;
+  cursor: pointer; white-space: nowrap;
+  transition: border-color .2s, background-color .2s;
+}
+.staff-btn:hover { border-color: var(--teal-bright); background: rgba(255, 255, 255, 0.12); color: #fff; }
+.staff-dropdown {
+  position: absolute; right: 0; top: calc(100% + 8px);
+  background: #fff; border: 1px solid var(--line-soft);
+  border-radius: 14px; box-shadow: var(--shadow-pop);
+  min-width: 230px; padding: 6px; z-index: 100;
+}
+.staff-dropdown a {
+  display: block; padding: 11px 13px; border-radius: 10px;
+  color: var(--navy2); text-decoration: none;
+  font-size: 14px; font-weight: 700;
+}
+.staff-dropdown a:hover { background: #f0fdfa; color: var(--teal); }
+
+/* Centered dark verify card (reference look, our emerald brand). */
+.terminal-card {
+  background: linear-gradient(180deg, #111c33 0%, #0d1526 100%);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 1.5rem;
+  box-shadow: 0 30px 60px -24px rgba(0, 0, 0, 0.6);
+  color: #fff;
+  max-width: 560px;
+  margin: 36px auto 18px;
+  padding: 36px 34px 30px;
+  text-align: center;
+}
+.terminal-card h2 { color: #fff; font-size: 26px; font-weight: 800; margin: 0 0 8px; letter-spacing: -0.02em; }
+.terminal-card .muted { color: #b8c4d8; margin-top: 0; }
+.terminal-card form { text-align: left; margin-top: 20px; }
+.terminal-card label { color: #e2e8f0; }
+.terminal-card input[type="text"] {
+  background: #0b1220;
+  border: 1.5px solid rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+.terminal-card input[type="text"]::placeholder { color: #64748b; }
+.terminal-card input[type="text"]:focus {
+  border-color: var(--teal-bright); background: #0b1220;
+  box-shadow: 0 0 0 4px rgba(45, 212, 191, 0.18);
+}
+.terminal-card .lookup-msg { color: #6ee7b7; }
+.terminal-card .lookup-msg.err { color: #fca5a5; }
+.terminal-pill {
+  display: inline-block;
+  font-size: 10px; font-weight: 800; letter-spacing: 0.22em; text-transform: uppercase;
+  color: #6ee7b7; background: rgba(5, 150, 105, 0.18); border: 1px solid rgba(52, 211, 153, 0.4);
+  padding: 0.35rem 0.85rem; border-radius: 9999px; margin-bottom: 14px;
+}
+
+/* Tiny footer version line. */
+.terminal-footer {
+  text-align: center;
+  font-size: 12px; color: #64748b;
+  padding: 16px 12px 20px;
+}
+
+@media (max-width: 700px) {
+  .terminal-header .header-inner { flex-direction: row; flex-wrap: wrap; }
+  .terminal-header h1 { font-size: 15px; }
+  .terminal-header .tagline { font-size: 11px; }
+  .terminal-header .header-logo-chip { width: 46px; height: 46px; flex-basis: 46px; }
+  .staff-btn { padding: 7px 13px; font-size: 12.5px; }
+  .terminal-card { margin: 22px 0 16px; padding: 28px 20px 24px; }
+  .terminal-card h2 { font-size: 21px; }
 }

@@ -515,3 +515,36 @@ console (Students + Dashboard), teacher queue, student page — desktop 1280
 and phone 390 — all render clean, no overlaps, zero page JS errors;
 wrong-roll message verified live. Screenshots: v150-*.png in the project
 folder (not shipped in the ZIP). Version bumped to 1.5.0.
+
+## v1.5.1 (2026-11-16) — Home page is the Student Terminal
+User order (with a screenshot of the other system on his PC): the home page
+must show ONLY the student roll-number terminal — students must NOT see the
+Admin/Teacher/Principal portals; staff access moves to one small discreet
+"Staff / Faculty Login" control at the top-right.
+Build: `/` now serves the SAME terminal page as `/student` (server route
+change — zero duplication: one markup file, one student.js). The terminal
+got the reference look in our brand: dark navy full page, slim header with
+logo + institute name and a "Staff / Faculty Login" pill button (dropdown:
+Teacher, Admin / Exam Controller, Principal — the only staff links on the
+page), centered dark card with logo, "LAN EXAMINATION STATION • MULTI-SHIFT"
+pill, "Candidate Identity Verification" heading, roll input and an
+emerald→teal→cyan "Verify Identity & Unlock Test" button, plus a tiny footer
+version line (filled live from /api/health). The full student flow works
+from `/` unchanged: roll verify -> read-only registered details -> test
+picker -> exam -> submit. Test picker and exam screens are white cards on
+the dark page; the offline-queue badge + Sync now button moved into the
+header. The old landing (hero + 4 portal cards) is gone: public/index.html
+is now a tiny redirect stub to `/` (so /index.html can never show the old
+portals again, even from a stale copy on the Admin PC — UPDATE.bat only
+copies, never deletes), and public/landing.js is removed (deleted from the
+repo too). Dead hero/portal CSS removed; `.section-label` kept (consoles
+use it). "Back to Home" stays on the three staff portals; the terminal IS
+home, so it has none. All portal URLs keep working; no functional changes.
+Tests: E2E still 208 PASS, 0 FAIL (landing assertions rewritten for the
+terminal: Staff menu links, no portal cards, / and /student serve the same
+page, /index.html redirects); e2e-sync-test.js still 51 PASS, 0 FAIL.
+Headless-Chromium check (CDP, real server, 0 JS errors): terminal desktop
+1280 + phone 390, staff dropdown open (exactly /teacher, /admin,
+/principal), wrong-roll message verified live in the browser ("Aapka Roll
+Number ghalat hai.", test stays locked), valid roll LAB001 shows the
+read-only details. Version bumped to 1.5.1.

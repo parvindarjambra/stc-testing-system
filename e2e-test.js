@@ -1,4 +1,4 @@
-// STC Testing System — end-to-end verification script (v1.5.0: real logo,
+// STC Testing System — end-to-end verification script (v1.5.1: real logo,
 // back-to-home, teacher import, fill-in-the-blank, course-wise results).
 // Usage: 1) wipe the test DB:  rm -f data/stc.sqlite data/*.json
 //        2) start server:      PORT=3102 node server.js   (auto-seeds users/courses on first start)
@@ -67,13 +67,17 @@ async function main() {
   const h = await req('GET', '/api/health');
   check('health 200 + ok', h.status === 200 && h.json && h.json.ok === true, JSON.stringify(h.json));
   check('db backend reported', h.json && (h.json.db === 'sqlite' || h.json.db === 'json'), h.json && h.json.db);
-  check('version is 1.5.0', h.json && h.json.version === '1.5.0', h.json && h.json.version);
+  check('version is 1.5.1', h.json && h.json.version === '1.5.1', h.json && h.json.version);
   const home = await req('GET', '/');
-  check('landing page serves institute name', home.status === 200 && home.text.includes('Super Sys-Tech Computers Centre'));
-  check('landing page serves Principal name', home.text.includes('Ramesh Kumar'));
-  check('landing has 4 portal entry links',
-    ['/student', '/teacher', '/admin', '/principal'].every((p) => home.text.includes('href="' + p + '"')));
-  check('landing has NO portal console content',
+  check('home is the Student Terminal (institute name + verify form + heading)',
+    home.status === 200 && home.text.includes('Super Sys-Tech Computers Centre') &&
+    home.text.includes('stu-verify-form') && home.text.includes('Candidate Identity Verification'));
+  check('terminal has Staff / Faculty Login control with 3 portal links',
+    home.text.includes('Staff / Faculty Login') &&
+    ['/teacher', '/admin', '/principal'].every((p) => home.text.includes('href="' + p + '"')));
+  check('terminal has NO portal cards',
+    !home.text.includes('portal-card') && !home.text.includes('Choose your portal'));
+  check('terminal has NO portal console content',
     !home.text.includes('teacher-queue') && !home.text.includes('tab-dashboard') && !home.text.includes('pa-totals'));
   const stuPage = await req('GET', '/student');
   check('student page serves (verify form, no login form)',
@@ -89,15 +93,19 @@ async function main() {
     priPage.status === 200 && priPage.text.includes('id="login-form"') && priPage.text.includes('Principal Login'));
   check('portal pages are distinct',
     stuPage.text !== teaPage.text && teaPage.text !== admPage.text && admPage.text !== priPage.text);
-  for (const f of ['common.js', 'student.js', 'teacher.js', 'admin.js', 'principal.js', 'landing.js']) {
+  check('home (/) and /student serve the same terminal page', home.text === stuPage.text);
+  for (const f of ['common.js', 'student.js', 'teacher.js', 'admin.js', 'principal.js']) {
     const r = await req('GET', '/' + f);
     check(f + ' serves', r.status === 200 && r.text.length > 500, f + ': ' + r.status);
   }
   const css = await req('GET', '/style.css');
-  check('style.css serves + restyled theme (stc.edu.pk navy, hero, sidebar)',
-    css.status === 200 && css.text.includes('#0f172a') && css.text.includes('.hero') && css.text.includes('.console-layout'));
+  check('style.css serves + restyled theme (stc.edu.pk navy, terminal, sidebar)',
+    css.status === 200 && css.text.includes('#0f172a') && css.text.includes('.terminal-card') && css.text.includes('.console-layout'));
   const tpl = await req('GET', '/students_template.csv');
   check('students_template.csv serves', tpl.status === 200 && tpl.text.includes('Roll Number'));
+  const idx = await req('GET', '/index.html');
+  check('/index.html redirects to the terminal (no old landing)',
+    idx.status === 200 && idx.text.includes('url=/') && !idx.text.includes('portal-card'));
   const unknown = await req('GET', '/no-such-page');
   check('unknown path -> 404 (no SPA fallback)', unknown.status === 404);
 
@@ -428,10 +436,13 @@ async function main() {
   check('principal shell has NO console markup',
     !priPage.text.includes('pa-totals') && !priPage.text.includes('pr-daysheet') && !priPage.text.includes('pm-teachers'));
   const portalHrefs = ['href="/student"', 'href="/teacher"', 'href="/admin"', 'href="/principal"'];
-  for (const [name, page] of [['student', stuPage], ['teacher', teaPage], ['admin', admPage], ['principal', priPage]]) {
+  for (const [name, page] of [['teacher', teaPage], ['admin', admPage], ['principal', priPage]]) {
     check(name + ' page has NO links to other portals',
       portalHrefs.every((h) => !page.text.includes(h)));
   }
+  check('terminal page links to staff portals ONLY via the Staff menu (one link each)',
+    ['href="/teacher"', 'href="/admin"', 'href="/principal"'].every((h) =>
+      stuPage.text.split(h).length === 2) && !stuPage.text.includes('href="/student"'));
   const fragNoAuth = await req('GET', '/fragments/admin-console.html');
   check('fragment without token -> 401', fragNoAuth.status === 401);
   const fragWrongRole = await req('GET', '/fragments/admin-console.html', null, tokens.kelash.token);
@@ -509,7 +520,7 @@ async function main() {
   const logoBuf = Buffer.from(await (await fetch(BASE + '/stc-logo.webp')).arrayBuffer());
   check('logo file is a real WebP (RIFF/WEBP header)',
     logoBuf.slice(0, 4).toString() === 'RIFF' && logoBuf.slice(8, 12).toString() === 'WEBP');
-  for (const [name, page] of [['landing', home], ['student', stuPage], ['teacher', teaPage], ['admin', admPage], ['principal', priPage]]) {
+  for (const [name, page] of [['terminal', home], ['student', stuPage], ['teacher', teaPage], ['admin', admPage], ['principal', priPage]]) {
     check(name + ' page uses the real logo (stc-logo.webp in a white chip)',
       page.text.includes('stc-logo.webp') && page.text.includes('header-logo-chip'));
   }
@@ -517,13 +528,13 @@ async function main() {
     [home, stuPage, teaPage, admPage, priPage].every((p) => !p.text.includes('header-logo">STC')));
 
   // --- 2. Back to Home (login shell + console share the topbar) ---
-  for (const [name, page] of [['student', stuPage], ['teacher', teaPage], ['admin', admPage], ['principal', priPage]]) {
+  for (const [name, page] of [['teacher', teaPage], ['admin', admPage], ['principal', priPage]]) {
     check(name + ' page has a Back to Home link to /',
       page.text.includes('Back to Home') && page.text.includes('href="/"'));
   }
-  check('landing page has no Back to Home link (it IS home)', !home.text.includes('Back to Home'));
-  check('portal pages still have NO portal-to-portal links (only /)',
-    [stuPage, teaPage, admPage, priPage].every((p) =>
+  check('terminal page has no Back to Home link (it IS home)', !home.text.includes('Back to Home'));
+  check('staff portal pages still have NO portal-to-portal links (only /)',
+    [teaPage, admPage, priPage].every((p) =>
       ['href="/student"', 'href="/teacher"', 'href="/admin"', 'href="/principal"'].every((h) => !p.text.includes(h))));
 
   // --- 3a. Student CSV import: teacher by username OR name; unknown teacher rejects the row ---
