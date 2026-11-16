@@ -22,7 +22,7 @@ const crypto = require('crypto');
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = '0.0.0.0';
-const VERSION = '1.4.1';
+const VERSION = '1.4.2';
 const ROOT = __dirname;
 const DATA_DIR = path.join(ROOT, 'data');
 const PUBLIC_DIR = path.join(ROOT, 'public');
@@ -1102,20 +1102,43 @@ function createApp(store) {
     }
     const teachers = store.find('users', (u) => u.role === 'teacher');
     // Assigned Teacher matches by username OR full name (case-insensitive).
+    // Forgiving: a leading honorific ("Sir ", "Mr. ", "Miss " ...) is ignored
+    // and extra spaces are collapsed — "Sir Ashok Kumar" matches Ashok Kumar.
     const findTeacher = (val) => {
       if (!val) return null;
-      const v = String(val).trim().toLowerCase();
+      const v = String(val).trim().toLowerCase().replace(/\s+/g, ' ')
+        .replace(/^(sir|mr|mrs|miss|ms|madam|dr)\.?\s+/, '');
       const t = teachers.find((u) =>
         u.username.toLowerCase() === v || u.name.toLowerCase() === v);
       return t ? t.id : null;
+    };
+    // Shift values are normalized before matching: extra spaces collapsed,
+    // en/em dashes treated as hyphens, single-digit hours zero-padded —
+    // "9:00 AM - 10:00 AM" becomes the canonical "09:00 AM - 10:00 AM".
+    // Anything that is not one of the 11 institute shifts still fails.
+    const normalizeShift = (val) => {
+      const s = String(val || '').trim().replace(/[\u2013\u2014\u2212]/g, '-').replace(/\s+/g, ' ');
+      const m = /^(\d{1,2}):(\d{2})\s*(AM|PM)\s*-\s*(\d{1,2}):(\d{2})\s*(AM|PM)$/i.exec(s);
+      if (!m) return s;
+      const pad = (h) => String(h).padStart(2, '0');
+      return pad(m[1]) + ':' + m[2] + ' ' + m[3].toUpperCase() + ' - ' +
+        pad(m[4]) + ':' + m[5] + ' ' + m[6].toUpperCase();
+    };
+    // Course names are matched case-insensitively to the canonical course
+    // list ("cit" -> "CIT"); unknown courses are kept as written.
+    const courses = store.find('courses');
+    const normalizeCourse = (val) => {
+      const v = String(val || '').trim();
+      const c = courses.find((x) => x.name.toLowerCase() === v.toLowerCase());
+      return c ? c.name : v;
     };
     for (let r = 1; r < rows.length; r++) {
       const row = rows[r];
       const roll = String(row[cRoll] || '').trim();
       const name = String(row[cName] || '').trim();
       const father = cFather >= 0 ? String(row[cFather] || '').trim() : '';
-      const course = cCourse >= 0 ? String(row[cCourse] || '').trim() : '';
-      const shift = cShift >= 0 ? String(row[cShift] || '').trim() : '';
+      const course = cCourse >= 0 ? normalizeCourse(row[cCourse]) : '';
+      const shift = cShift >= 0 ? normalizeShift(row[cShift]) : '';
       const teacherNameVal = cTeacher >= 0 ? String(row[cTeacher] || '').trim() : '';
       if (!roll || !name) { errors.push({ row: r + 1, error: 'missing roll number or student name' }); continue; }
       if (store.findOne('students', (s) => s.roll_number.toLowerCase() === roll.toLowerCase())) { skipped++; continue; }

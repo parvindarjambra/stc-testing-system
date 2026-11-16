@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- =====================================================================
-     STC Testing System — Offline Lab App (USB sync, v1.4.1).
+     STC Testing System — Offline Lab App (USB sync, v1.4.2).
      Super Sys-Tech Computers Centre, Umerkot.
 
      SELF-CONTAINED: inline CSS + inline JS, ZERO external references,
@@ -524,7 +524,7 @@ function exportSubmissions() {
     '-' + pad(now.getHours()) + pad(now.getMinutes());
   var envelope = {
     format: 'stc-lab-submissions',
-    version: '1.4.1',
+    version: '1.4.2',
     pack_id: (LAB_PACK && LAB_PACK.pack_id) || null,
     exported_at: now.toISOString(),
     submissions: saved

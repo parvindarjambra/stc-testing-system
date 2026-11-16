@@ -1,6 +1,6 @@
 # STC Testing System — Examination, Quiz & Result Management System
 
-**Version 1.4.1** — **No fixed consolidation time**: the 7:30 PM auto-consolidation is removed; Admin runs **Day Consolidation** any time — same evening or next morning — picking the date. **USB sync for offline labs** (v1.4.0): labs with no network at all get a standalone lab app (`STC-Lab.html`) — students test fully offline, and submissions come back on a USB stick for Admin to import (see §1c). Everything from v1.3.2 stays: the code lives on GitHub (https://github.com/parvindarjambra/stc-testing-system) with one-click updates (double-click `UPDATE.bat` on the Admin PC, no more ZIP downloads); laptops on the LAN need nothing installed — they just open the exam page in the browser (see §1b). Renamed to **STC Testing System**; the real STC logo in every header (local file, offline); a "Back to Home" button on every portal page; teacher CSV import; fill-in-the-blank questions (teacher-graded, like theory); Admin course-wise results export to Excel (CSV) + printable course-wise result sheets. See TEST_REPORT.md for the full v1.4.1 note.
+**Version 1.4.2** — **Forgiving student CSV import + demo row in the template** (see §6): "Sir Ashok Kumar" now matches, unpadded "9:00 AM" shifts and lowercase courses ("cit" → "CIT") are accepted. **No fixed consolidation time** (v1.4.1): the 7:30 PM auto-consolidation is removed; Admin runs **Day Consolidation** any time — same evening or next morning — picking the date. **USB sync for offline labs** (v1.4.0): labs with no network at all get a standalone lab app (`STC-Lab.html`) — students test fully offline, and submissions come back on a USB stick for Admin to import (see §1c). Everything from v1.3.2 stays: the code lives on GitHub (https://github.com/parvindarjambra/stc-testing-system) with one-click updates (double-click `UPDATE.bat` on the Admin PC, no more ZIP downloads); laptops on the LAN need nothing installed — they just open the exam page in the browser (see §1b). Renamed to **STC Testing System**; the real STC logo in every header (local file, offline); a "Back to Home" button on every portal page; teacher CSV import; fill-in-the-blank questions (teacher-graded, like theory); Admin course-wise results export to Excel (CSV) + printable course-wise result sheets. See TEST_REPORT.md for the full v1.4.2 note.
 
 **Super Sys-Tech Computers Centre, Umerkot** (also known as Super City Computer Center)
 *"Empowering Skills Since 1997"*
@@ -285,7 +285,12 @@ is 40%.
   commas, skips duplicate roll numbers, and reports every bad row.
   The Assigned Teacher column takes a teacher's **username or full name**
   (e.g. `kelash` or `Kelash Kumar`); a name that matches no teacher rejects
-  that row with a clear error naming the row.
+  that row with a clear error naming the row. The template now carries one
+  demo row (`1001,Demo Student,Demo Father,CIT,08:00 AM - 09:00 AM,Ashok Kumar`)
+  showing the exact format — delete that line before importing your own list.
+  The importer is forgiving: a leading `Sir ` / `Mr. ` is ignored, `9:00 AM`
+  works as `09:00 AM`, and lowercase courses are corrected to the official
+  name (`cit` → `CIT`).
 - **Teacher import:** Admin → Teachers → Import CSV. Use the downloadable
   `teachers_template.csv` (columns: Teacher Name, Course, Username, Password).
   Username is optional (auto from the first name) and Password is optional

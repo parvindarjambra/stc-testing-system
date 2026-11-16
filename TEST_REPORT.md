@@ -473,3 +473,21 @@ Tests: existing E2E still 205 PASS, 0 FAIL; e2e-sync-test.js still 51 PASS,
 (2026-11-15) returned 200 {"ok":true,"date":"2026-11-15","rows":0,
 "locked":true}; served admin fragment contains "Day Consolidation" (3x) and
 zero "7:30" matches. Version bumped to 1.4.1.
+
+## v1.4.2 (2026-11-16) — Forgiving student CSV import + demo row in the template
+User's import failed on all 8 rows: teachers written "Sir Ashok Kumar" /
+"Sir Kapil" (unknown — the system matched exact full name or username only)
+and one shift typed "09:00 AM - 010:00 AM" (extra 0). User asked: if the
+format must be exact, the sample should show at least one demo line.
+Fix: (1) students_template.csv (root + public/) now carries one demo row
+(1001,Demo Student,Demo Father,CIT,08:00 AM - 09:00 AM,Ashok Kumar) showing
+the exact format — delete that line before importing your own list.
+(2) The importer is forgiving: a leading honorific (Sir/Mr./Mrs./Miss/Ms./
+Madam/Dr.) is ignored, shift values are normalized (whitespace collapsed,
+en/em dashes treated as hyphens, single-digit hours zero-padded: "9:00 AM"
+works as "09:00 AM"), and course names match case-insensitively to the
+canonical list ("cit" -> "CIT"). Genuinely wrong values still reject the row
+("No Such Teacher", "25:00 PM - 26:00 PM"). Stored values are canonical.
+Tests: E2E 208 PASS, 0 FAIL (was 205; +3 new: forgiving import row, canonical
+values via lookup, template demo row); e2e-sync-test.js still 51 PASS,
+0 FAIL. Version bumped to 1.4.2.

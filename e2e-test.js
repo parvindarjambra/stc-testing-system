@@ -1,4 +1,4 @@
-// STC Testing System — end-to-end verification script (v1.4.1: real logo,
+// STC Testing System — end-to-end verification script (v1.4.2: real logo,
 // back-to-home, teacher import, fill-in-the-blank, course-wise results).
 // Usage: 1) wipe the test DB:  rm -f data/stc.sqlite data/*.json
 //        2) start server:      PORT=3102 node server.js   (auto-seeds users/courses on first start)
@@ -67,7 +67,7 @@ async function main() {
   const h = await req('GET', '/api/health');
   check('health 200 + ok', h.status === 200 && h.json && h.json.ok === true, JSON.stringify(h.json));
   check('db backend reported', h.json && (h.json.db === 'sqlite' || h.json.db === 'json'), h.json && h.json.db);
-  check('version is 1.4.1', h.json && h.json.version === '1.4.1', h.json && h.json.version);
+  check('version is 1.4.2', h.json && h.json.version === '1.4.2', h.json && h.json.version);
   const home = await req('GET', '/');
   check('landing page serves institute name', home.status === 200 && home.text.includes('Super Sys-Tech Computers Centre'));
   check('landing page serves Principal name', home.text.includes('Ramesh Kumar'));
@@ -351,6 +351,20 @@ async function main() {
   check('imported quoted-comma name found via lookup', impL.json && impL.json.found && impL.json.student.name === 'Comma, Test');
   const imp2 = await req('POST', '/api/students/import', { csv }, admin.token);
   check('re-import skips duplicates (2 skipped)', imp2.json && imp2.json.skipped === 2, JSON.stringify(imp2.json));
+  // v1.4.2: forgiving import — "Sir " prefix, unpadded hour, lowercase course.
+  const csvF = 'Roll Number,Student Name,Father\'s Name,Course,Shift,Assigned Teacher\n' +
+    'STC-2026-104,Forgiving Test,Test Father,cit,9:00 AM - 10:00 AM,Sir Ashok Kumar\n';
+  const impF = await req('POST', '/api/students/import', { csv: csvF }, admin.token);
+  check('forgiving import: Sir prefix + 9:00 AM + lowercase cit -> 1 imported, 0 errors',
+    impF.json && impF.json.imported === 1 && (impF.json.errors || []).length === 0, JSON.stringify(impF.json));
+  const impFL = await req('GET', '/api/students/lookup?roll=STC-2026-104');
+  check('forgiving import stored canonical values (CIT, 09:00 AM - 10:00 AM, Ashok Kumar)',
+    impFL.json && impFL.json.found && impFL.json.student.course === 'CIT' &&
+    impFL.json.student.shift === '09:00 AM - 10:00 AM' &&
+    impFL.json.student.teacher_name === 'Ashok Kumar', JSON.stringify(impFL.json && impFL.json.student));
+  const tplCsv = await req('GET', '/students_template.csv');
+  check('students template has a demo row (Demo Student, Ashok Kumar)',
+    tplCsv.status === 200 && tplCsv.text.includes('Demo Student') && tplCsv.text.includes('08:00 AM - 09:00 AM'));
 
   console.log('\n[14] Test builder — month validation');
   const noMonth = await req('POST', '/api/tests', {
