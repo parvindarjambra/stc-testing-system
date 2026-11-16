@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- =====================================================================
-     STC Testing System — Offline Lab App (USB sync, v1.5.1).
+     STC Testing System — Offline Lab App (USB sync, v1.6.0).
      Super Sys-Tech Computers Centre, Umerkot.
 
      SELF-CONTAINED: inline CSS + inline JS, ZERO external references,
@@ -120,17 +120,26 @@ th { color: #475569; font-weight: 600; width: 38%; }
     <p>This file has no student list or tests in it. Please use the <strong>STC-Lab.html</strong> file exported by Admin from the Admin portal (USB Lab Sync).</p>
   </div>
 
-  <!-- Step 1: roll number verification (strict — pack list only) -->
+  <!-- Step 1: four-field identity verification (strict — pack list only) -->
   <div id="stu-start" class="card narrow hidden">
     <div class="login-badge">&#9998;</div>
     <h2>Student Exam — Start</h2>
-    <p class="muted">Enter your roll number. Only roll numbers registered by Admin can take a test.</p>
+    <p class="muted">Enter all four fields exactly as registered by Admin. Only students on Admin's list can take a test.</p>
     <form id="stu-verify-form">
+      <label>Full Name
+        <input id="stu-name" type="text" placeholder="Enter your full name" autocomplete="off">
+      </label>
+      <label>Father's Name
+        <input id="stu-father" type="text" placeholder="Enter your father's name" autocomplete="off">
+      </label>
+      <label>Course
+        <input id="stu-course" type="text" placeholder="Enter your course (e.g. DIT)" autocomplete="off">
+      </label>
       <label>Roll Number
-        <input id="stu-roll" type="text" required placeholder="Enter your roll number" autocomplete="off">
+        <input id="stu-roll" type="text" placeholder="Enter your roll number" autocomplete="off">
       </label>
       <p id="stu-verify-msg" class="lookup-msg"></p>
-      <button class="btn btn-primary btn-big" type="submit">Verify Roll Number</button>
+      <button class="btn btn-primary btn-big" type="submit">Verify Identity &amp; Unlock Test</button>
     </form>
   </div>
 
@@ -141,7 +150,7 @@ th { color: #475569; font-weight: 600; width: 38%; }
     <div id="stu-details-body"></div>
     <div class="btn-row">
       <button class="btn btn-primary btn-big" type="button" id="stu-confirm">Confirm &amp; Show My Tests</button>
-      <button class="btn" type="button" id="stu-change-roll">Change roll number</button>
+      <button class="btn" type="button" id="stu-change-roll">Change details</button>
     </div>
   </div>
 
@@ -234,15 +243,29 @@ function updateSavedBadge() {
   badge.classList.toggle('hidden', n === 0);
 }
 
-/* ---------------- Step 1: strict roll validation against the pack ---------------- */
-function findStudent(roll) {
-  var r = String(roll || '').trim().toLowerCase();
-  if (!r) return null;
+/* ---------------- Step 1: four-field verification against the pack ----------------
+   SAME matching as the server (POST /api/students/verify): Name, then
+   Father's Name, then Course, then Roll Number — the first mismatch is
+   reported, in English. Case-insensitive, whitespace collapsed. */
+function normField(v) {
+  return String(v == null ? '' : v).trim().replace(/\s+/g, ' ').toLowerCase();
+}
+function verifyStudent(input) {
   var list = (LAB_PACK && LAB_PACK.students) || [];
-  for (var i = 0; i < list.length; i++) {
-    if (String(list[i].roll_number).toLowerCase() === r) return list[i];
+  var name = normField(input.name), father = normField(input.father_name),
+      course = normField(input.course), roll = normField(input.roll);
+  var c = list.filter(function (s) { return normField(s.name) === name; });
+  if (!c.length) return { errorCode: 'name_wrong', error: 'Your Name is wrong.' };
+  c = c.filter(function (s) { return normField(s.father_name) === father; });
+  if (!c.length) return { errorCode: 'father_wrong', error: "Your Father's Name is wrong." };
+  c = c.filter(function (s) { return normField(s.course) === course; });
+  if (!c.length) return { errorCode: 'course_wrong', error: 'Your Course is wrong.' };
+  var match = null;
+  for (var i = 0; i < c.length; i++) {
+    if (normField(c[i].roll_number) === roll) { match = c[i]; break; }
   }
-  return null;
+  if (!match) return { errorCode: 'roll_wrong', error: 'Your Roll Number is wrong.' };
+  return { student: match };
 }
 function initLab() {
   if (!LAB_PACK || !Array.isArray(LAB_PACK.students) || !Array.isArray(LAB_PACK.tests)) {
@@ -255,15 +278,23 @@ function initLab() {
 
   $('stu-verify-form').addEventListener('submit', function (e) {
     e.preventDefault();
-    var roll = $('stu-roll').value.trim();
-    if (!roll) return;
     var msg = $('stu-verify-msg');
-    var st = findStudent(roll);
-    if (!st) {
-      msg.textContent = 'Aapka Roll Number ghalat hai.';
+    var name = $('stu-name').value.trim();
+    var father = $('stu-father').value.trim();
+    var course = $('stu-course').value.trim();
+    var roll = $('stu-roll').value.trim();
+    if (!name || !father || !course || !roll) {
+      msg.textContent = 'Please fill in all four fields: Name, Father\'s Name, Course and Roll Number.';
       msg.className = 'lookup-msg err';
       return;
     }
+    var r = verifyStudent({ name: name, father_name: father, course: course, roll: roll });
+    if (!r.student) {
+      msg.textContent = r.error;
+      msg.className = 'lookup-msg err';
+      return;
+    }
+    var st = r.student;
     S.student = {
       roll_number: st.roll_number, name: st.name, father_name: st.father_name || '',
       course: st.course, shift: st.shift,
@@ -284,11 +315,14 @@ function initLab() {
   $('stu-change-roll').addEventListener('click', function () {
     S.student = null;
     $('stu-details').classList.add('hidden');
+    $('stu-name').value = '';
+    $('stu-father').value = '';
+    $('stu-course').value = '';
     $('stu-roll').value = '';
     $('stu-verify-msg').textContent = '';
     $('stu-verify-msg').className = 'lookup-msg';
     $('stu-start').classList.remove('hidden');
-    $('stu-roll').focus();
+    $('stu-name').focus();
   });
   $('stu-tests-back').addEventListener('click', function () {
     $('stu-tests').classList.add('hidden');
@@ -503,6 +537,9 @@ function resetStudent() {
   $('stu-tests').classList.add('hidden');
   $('stu-exam').classList.add('hidden');
   $('stu-details').classList.add('hidden');
+  $('stu-name').value = '';
+  $('stu-father').value = '';
+  $('stu-course').value = '';
   $('stu-roll').value = '';
   $('stu-verify-msg').textContent = '';
   $('stu-verify-msg').className = 'lookup-msg';
@@ -510,7 +547,7 @@ function resetStudent() {
   $('exam-submit').disabled = false;
   S.student = null; S.test = null; S.answers = {};
   $('stu-start').classList.remove('hidden');
-  $('stu-roll').focus();
+  $('stu-name').focus();
   window.scrollTo(0, 0);
 }
 
@@ -524,7 +561,7 @@ function exportSubmissions() {
     '-' + pad(now.getHours()) + pad(now.getMinutes());
   var envelope = {
     format: 'stc-lab-submissions',
-    version: '1.5.1',
+    version: '1.6.0',
     pack_id: (LAB_PACK && LAB_PACK.pack_id) || null,
     exported_at: now.toISOString(),
     submissions: saved

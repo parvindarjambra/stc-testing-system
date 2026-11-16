@@ -1,6 +1,6 @@
 # STC Testing System — Examination, Quiz & Result Management System
 
-**Version 1.5.1** — **Home page is the Student Terminal**: `/` now shows ONLY the student roll-number terminal (same page as `/student`) — students never see the staff portals; staff log in from the single discreet **Staff / Faculty Login** menu at the top-right. **Modern redesign** (v1.5.0): deep-navy sidebar console with brand block + icon tabs, pill badges for teachers/courses/shifts, refreshed landing hero and dark login screens — same flows, no feature changes. Wrong-roll message is now exactly 'Aapka Roll Number ghalat hai.' and the teacher button is 'Submit to Admin'. **Forgiving student CSV import** (v1.4.2, see §6): "Sir Ashok Kumar" now matches, unpadded "9:00 AM" shifts and lowercase courses ("cit" → "CIT") are accepted. **No fixed consolidation time** (v1.4.1): the 7:30 PM auto-consolidation is removed; Admin runs **Day Consolidation** any time — same evening or next morning — picking the date. **USB sync for offline labs** (v1.4.0): labs with no network at all get a standalone lab app (`STC-Lab.html`) — students test fully offline, and submissions come back on a USB stick for Admin to import (see §1c). Everything from v1.3.2 stays: the code lives on GitHub (https://github.com/parvindarjambra/stc-testing-system) with one-click updates (double-click `UPDATE.bat` on the Admin PC, no more ZIP downloads); laptops on the LAN need nothing installed — they just open the exam page in the browser (see §1b). Renamed to **STC Testing System**; the real STC logo in every header (local file, offline); a "Back to Home" button on every staff portal page (the Student Terminal IS home); teacher CSV import; fill-in-the-blank questions (teacher-graded, like theory); Admin course-wise results export to Excel (CSV) + printable course-wise result sheets. See TEST_REPORT.md for the full v1.5.1 note.
+**Version 1.6.0** — **Four-field student verification**: the student enters Name, Father's Name, Course and Roll Number (not roll number only); the system checks them in that order against Admin's list and names the first wrong field in English, and the teacher's name auto-fills from Admin's data. **Home page is the Student Terminal** (v1.5.1): `/` now shows ONLY the student roll-number terminal (same page as `/student`) — students never see the staff portals; staff log in from the single discreet **Staff / Faculty Login** menu at the top-right. **Modern redesign** (v1.5.0): deep-navy sidebar console with brand block + icon tabs, pill badges for teachers/courses/shifts, refreshed landing hero and dark login screens — same flows, no feature changes. The first wrong field is named in English ('Your Name is wrong.', 'Your Father's Name is wrong.', 'Your Course is wrong.', 'Your Roll Number is wrong.'), and the teacher button is 'Submit to Admin'. **Forgiving student CSV import** (v1.4.2, see §6): "Sir Ashok Kumar" now matches, unpadded "9:00 AM" shifts and lowercase courses ("cit" → "CIT") are accepted. **No fixed consolidation time** (v1.4.1): the 7:30 PM auto-consolidation is removed; Admin runs **Day Consolidation** any time — same evening or next morning — picking the date. **USB sync for offline labs** (v1.4.0): labs with no network at all get a standalone lab app (`STC-Lab.html`) — students test fully offline, and submissions come back on a USB stick for Admin to import (see §1c). Everything from v1.3.2 stays: the code lives on GitHub (https://github.com/parvindarjambra/stc-testing-system) with one-click updates (double-click `UPDATE.bat` on the Admin PC, no more ZIP downloads); laptops on the LAN need nothing installed — they just open the exam page in the browser (see §1b). Renamed to **STC Testing System**; the real STC logo in every header (local file, offline); a "Back to Home" button on every staff portal page (the Student Terminal IS home); teacher CSV import; fill-in-the-blank questions (teacher-graded, like theory); Admin course-wise results export to Excel (CSV) + printable course-wise result sheets. See TEST_REPORT.md for the full v1.6.0 note.
 
 **Super Sys-Tech Computers Centre, Umerkot** (also known as Super City Computer Center)
 *"Empowering Skills Since 1997"*
@@ -45,7 +45,7 @@ bookmark the ones you need:
 
 | Portal | Address | Login |
 |---|---|---|
-| Student Terminal (home) | `http://<IP>:3000/` | Roll Number only (no password) |
+| Student Terminal (home) | `http://<IP>:3000/` | Name + Father's Name + Course + Roll Number (no password) |
 | Student Exam | `http://<IP>:3000/student` | Same terminal page |
 | Teacher | `http://<IP>:3000/teacher` | Teacher username + password |
 | Admin / Exam Controller | `http://<IP>:3000/admin` | Admin username + password |
@@ -121,8 +121,9 @@ moves only on a USB stick.
    all students and all tests. Copy it to every lab laptop (USB stick).
    Export a fresh pack whenever students or tests change.
 2. **Students test fully offline.** Double-click `STC-Lab.html` — no server,
-   no Node.js, no Wi-Fi needed on the laptop. Roll number is checked against
-   the pack (unknown roll numbers are refused), the test runs with its timer,
+   no Node.js, no Wi-Fi needed on the laptop. Name, Father's Name, Course
+   and Roll Number are checked against the pack (the first wrong field is
+   named, in English), the test runs with its timer,
    and each submit is saved on that laptop. The screen clears for the next
    student, exactly like the online portal.
 3. **Evening — teacher exports from each laptop.** In the lab app, the
@@ -173,14 +174,17 @@ moves only on a USB stick.
 | Teacher | `pawan` | `teacher123` | Pawan — DIT, CIT, One Year Compulsory |
 | Teacher | `kapil` | `teacher123` | Kapil — DIT, CIT, One Year Compulsory |
 
-Students do **not** log in — they just type their Roll Number on the Student Exam
-screen (`/student`). The roll number **must be in Admin's student list**
-(see §6): if it is not found, the student sees *"Aapka Roll Number ghalat
-hai."* and cannot enter any test. If it is found, the
-registered name, father's name, course, shift and assigned teacher are shown
-**read-only** (the student cannot change them) — the student confirms and picks
-a test. There is no manual-details entry: **import your real student lists
-first** (Admin → Students → Import CSV), or students cannot take tests.
+Students do **not** log in — they type four fields on the Student Exam
+screen (`/`, same as `/student`): **Name, Father's Name, Course and Roll
+Number**. All four are checked **in that order** against Admin's student
+list (see §6): if a field does not match, the student sees exactly which
+one is wrong, in English — *"Your Name is wrong."*, *"Your Father's Name
+is wrong."*, *"Your Course is wrong."* or *"Your Roll Number is wrong."* —
+and cannot enter any test. If all four match, the registered details are
+shown **read-only** (the student cannot change them) with the assigned
+teacher's name auto-filled from Admin's data — the student confirms and
+picks a test. **Import your real student lists first**
+(Admin → Students → Import CSV), or students cannot take tests.
 The system ships with **no students and no tests** — the Students and Tests
 lists start empty, and Admin adds the real data. First-run flow: Admin logs
 in → adds students (Add Student, or Import CSV with the provided template)
@@ -207,7 +211,7 @@ or demo data anywhere in the system.
 | Time | What happens |
 |---|---|
 | Before 7:00 AM | Admin starts the server (`START.bat`) and checks the dashboard. |
-| 7:00 AM – 7:00 PM | 11 one-hour shifts run (see below). Students open the home page — the Student Terminal (`/`, same as `/student`), type their Roll Number (it must be on Admin's list), pick their test, and submit. After every submission the screen resets itself automatically, so the laptop is immediately ready for the next shift's student — no login conflicts. |
+| 7:00 AM – 7:00 PM | 11 one-hour shifts run (see below). Students open the home page — the Student Terminal (`/`, same as `/student`), type their Name, Father's Name, Course and Roll Number (all four must match Admin's list), pick their test, and submit. After every submission the screen resets itself automatically, so the laptop is immediately ready for the next shift's student — no login conflicts. |
 | During the day | Teachers log in at `/teacher`, grade theory and fill-in-the-blank answers, and click **Submit to Admin**. |
 | Evening or next morning | Admin opens **Day Consolidation**, picks the date, and presses **Run Day Consolidation & Sync** — the system compiles the whole day's master record (all shifts, all laptops) and locks it. Running it again is safe, it never duplicates rows. The locked day sheet is then visible to Admin, Principal, and each teacher (their own students only). |
 | End of month | Admin opens **Monthly Report**, picks the month, reviews the compiled results, and exports/prints the Official Monthly Test & Progress Report. |
@@ -239,14 +243,16 @@ screen. There are no links between portals inside any portal — only a
 "← Back to Home" button that returns to the Student Terminal (on the login
 screen and inside the console).
 
-**Student Exam Portal — `/` and `/student` (same terminal page; no login, Roll Number only)**
-Roll Number check against Admin's list → registered details shown read-only →
-confirm → test picker → exam screen with live countdown timer, question
-palette, auto-submit on timeout. MCQs are auto-graded from the Admin's answer
-key; theory and fill-in-the-blank answers go to the teacher for marking.
-After submitting, the screen shows the MCQ score, then clears the
-session immediately for the next student. A roll number that is not on the
-list cannot enter any test (see §2, §6).
+**Student Exam Portal — `/` and `/student` (same terminal page; no login, four-field verification)**
+Name + Father's Name + Course + Roll Number checked against Admin's list
+(first wrong field named, in English) → registered details shown read-only
+(teacher auto-filled) → confirm → test picker → exam screen with live
+countdown timer, question palette, auto-submit on timeout. MCQs are
+auto-graded from the Admin's answer key; theory and fill-in-the-blank
+answers go to the teacher for marking. After submitting, the screen shows
+the MCQ score, then clears the session immediately for the next student.
+A student whose details do not match the list cannot enter any test
+(see §2, §6).
 
 **Teacher Portal — `/teacher` (login)**
 Each teacher sees **only** their own assigned students (enforced by the
@@ -306,14 +312,16 @@ is 40%.
 - **Excel files:** the importer reads **CSV only**. In Excel, open your `.xlsx`
   and use **File → Save As → CSV UTF-8** first, then import the `.csv`.
 - **Per-student teacher:** every student has their *own* assigned teacher (not
-  one teacher per class). Roll-number lookup fills that teacher in; the
-  details shown to the student are read-only — if anything is wrong, Admin
-  corrects it in the student list (Admin → Students → Edit). A teacher's
-  portal shows only their own students.
-- **Only listed roll numbers can take tests.** A student whose roll number is
-  not in the list is turned away at the Student Exam screen with a message to
-  contact Admin. There is no manual-details entry — keep the list up to date:
-  import the real class lists before the first test day.
+  one teacher per class). Four-field verification fills that teacher in
+  automatically from the registered record; the details shown to the
+  student are read-only — if anything is wrong, Admin corrects it in the
+  student list (Admin → Students → Edit). A teacher's portal shows only
+  their own students.
+- **Only listed students can take tests.** A student whose Name, Father's
+  Name, Course or Roll Number does not match the list is turned away at
+  the Student Exam screen, told exactly which field is wrong (in English),
+  and asked to contact Admin. Keep the list up to date: import the real
+  class lists before the first test day.
 
 ---
 

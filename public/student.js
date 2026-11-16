@@ -57,24 +57,37 @@ async function flushQueue() {
 }
 setInterval(flushQueue, 15000);   // retry every 15 seconds
 
-/* Strict roll validation: ONLY roll numbers registered by Admin (via the
-   student list / CSV import) can take a test. There is no manual entry:
-   the registered details are shown read-only and the server re-validates
-   the roll number on submit. */
+/* Four-field identity verification (v1.6.0): the student enters Name,
+   Father's Name, Course and Roll Number; the server checks them IN ORDER
+   against Admin's registered list (student list / CSV import) and names
+   the first wrong field, in English. On a full match the registered
+   details are shown read-only and the server re-validates the roll
+   number on submit. */
 function initStudent() {
   const form = $('stu-verify-form');
   const msg = $('stu-verify-msg');
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
+    const name = $('stu-name').value.trim();
+    const father = $('stu-father').value.trim();
+    const course = $('stu-course').value.trim();
     const roll = $('stu-roll').value.trim();
-    if (!roll) return;
-    msg.textContent = 'Checking roll number...';
+    if (!name || !father || !course || !roll) {
+      msg.textContent = 'Please fill in all four fields: Name, Father\'s Name, Course and Roll Number.';
+      msg.className = 'lookup-msg err';
+      return;
+    }
+    msg.textContent = 'Checking your details...';
     msg.className = 'lookup-msg';
     try {
-      const d = await api('/api/students/lookup?roll=' + encodeURIComponent(roll), { noAuth: true });
-      if (!d.found || !d.student) {
-        msg.textContent = 'Aapka Roll Number ghalat hai.';
+      const d = await api('/api/students/verify', {
+        method: 'POST', noAuth: true,
+        body: { name: name, father_name: father, course: course, roll: roll }
+      });
+      if (!d.verified || !d.student) {
+        // The server names the first wrong field, in English.
+        msg.textContent = d.error || 'Your details could not be verified.';
         msg.className = 'lookup-msg err';
         return;
       }
@@ -99,7 +112,7 @@ function initStudent() {
       $('stu-start').classList.add('hidden');
       $('stu-details').classList.remove('hidden');
     } catch (err) {
-      msg.textContent = 'Could not check roll number: ' + err.message + ' — please try again.';
+      msg.textContent = 'Could not verify your details: ' + err.message + ' — please try again.';
       msg.className = 'lookup-msg err';
     }
   });
@@ -108,11 +121,14 @@ function initStudent() {
   $('stu-change-roll').addEventListener('click', () => {
     S.student = null;
     $('stu-details').classList.add('hidden');
+    $('stu-name').value = '';
+    $('stu-father').value = '';
+    $('stu-course').value = '';
     $('stu-roll').value = '';
     $('stu-verify-msg').textContent = '';
     $('stu-verify-msg').className = 'lookup-msg';
     $('stu-start').classList.remove('hidden');
-    $('stu-roll').focus();
+    $('stu-name').focus();
   });
   $('stu-tests-back').addEventListener('click', () => {
     $('stu-tests').classList.add('hidden');
@@ -351,6 +367,9 @@ function resetStudent() {
   $('stu-tests').classList.add('hidden');
   $('stu-exam').classList.add('hidden');
   $('stu-details').classList.add('hidden');
+  $('stu-name').value = '';
+  $('stu-father').value = '';
+  $('stu-course').value = '';
   $('stu-roll').value = '';
   $('stu-verify-msg').textContent = '';
   $('stu-verify-msg').className = 'lookup-msg';
@@ -358,7 +377,7 @@ function resetStudent() {
   $('exam-submit').disabled = false;
   S.student = null; S.test = null; S.answers = {};
   $('stu-start').classList.remove('hidden');
-  $('stu-roll').focus();
+  $('stu-name').focus();
   window.scrollTo(0, 0);
 }
 

@@ -548,3 +548,44 @@ Headless-Chromium check (CDP, real server, 0 JS errors): terminal desktop
 /principal), wrong-roll message verified live in the browser ("Aapka Roll
 Number ghalat hai.", test stays locked), valid roll LAB001 shows the
 read-only details. Version bumped to 1.5.1.
+
+## v1.6.0 (2026-11-16) — Four-field student verification
+
+User order (Roman Urdu): the student must enter ALL FOUR fields — Name,
+Father's Name, Course, Roll Number — not roll number only. The system
+checks ("approves") them against the students Admin imported; if all match,
+the student takes the test and the teacher's name auto-fills from Admin's
+data; if a field is wrong, the system says WHICH one is wrong, IN ENGLISH.
+Build: new endpoint POST /api/students/verify (no auth, like the old
+lookup). Matching is ordered — name, then father's name, then course, then
+roll number — and the first mismatch is reported: name_wrong / "Your Name
+is wrong.", father_wrong / "Your Father's Name is wrong.", course_wrong /
+"Your Course is wrong.", roll_wrong / "Your Roll Number is wrong."
+Comparison is case-insensitive with whitespace collapsed; course names are
+matched to the canonical course list ("cit" matches "CIT"). Full match
+returns 200 verified:true with the student record (roll, name, father_name,
+course, shift, teacher_name — the teacher name IS the auto-fill). Missing
+fields -> 400 fields_required. The old GET /api/students/lookup is retired
+(no callers remained; returns 404). The terminal (public/student.html +
+student.js) now shows the four fields in the same v1.5.1 dark-navy card
+(Course is a free-text input, NOT a dropdown, so a student whose imported
+course spelling differs is never locked out); empty fields get a plain
+English prompt; on error the server's exact message shows and the test
+stays locked; on success the existing read-only details table (Teacher
+auto-filled) -> Confirm -> test picker -> exam is unchanged. The lab app
+(lab-template.html) has the same four-field form and the SAME matching
+logic + messages, client-side against the pack; no answer keys in the
+pack (unchanged). The Roman Urdu message ("Aapka Roll Number ghalat hai.")
+is gone everywhere. No other functional changes.
+Tests: E2E 219 PASS, 0 FAIL (was 208; +11: new verify checks in section
+[5] — full match, case/whitespace tolerance, all four wrong-field
+messages, missing field, retired lookup — and new source checks for the
+English messages + four fields in both apps); e2e-sync-test.js still 51
+PASS, 0 FAIL. Headless-Chromium check (CDP, real server, 0 JS errors):
+terminal desktop 1280 + phone 390 with four fields, wrong-name and
+wrong-roll messages verified live in the browser (exact text, test stays
+locked), full match shows details with teacher auto-filled. Lab smoke
+(real exported STC-Lab.html in Chromium): 23 PASS, 0 FAIL (wrong name /
+wrong roll / full match + full exam + export + clear). Screenshots:
+v160-*.png in the project folder (not shipped in the ZIP). Version
+bumped to 1.6.0.

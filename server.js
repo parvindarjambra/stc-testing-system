@@ -6,12 +6,15 @@
 // Portals are SEPARATE pages: / (landing), /student, /teacher, /admin,
 // /principal. Staff consoles are served as authenticated fragments from
 // ./fragments (never static), so no console content is visible without login.
-// Students can only test with a roll number registered by Admin.
+// Students verify with four fields — Name, Father's Name, Course, Roll
+// Number — checked in that order against Admin's registered list
+// (POST /api/students/verify); the first wrong field is named, in English.
 // USB SYNC (v1.4.0): offline labs with no network at all get a standalone
 // lab app (GET /api/lab-pack, Admin only) — a single self-contained HTML
 // file with students + tests but NO answer keys. Submissions come back on
 // a USB stick and are imported via POST /api/lab-import (Admin only),
 // which auto-grades MCQs server-side and dedupes by client_id.
+// v1.6.0: four-field student verification (name/father/course/roll).
 
 'use strict';
 
@@ -22,7 +25,7 @@ const crypto = require('crypto');
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = '0.0.0.0';
-const VERSION = '1.5.1';
+const VERSION = '1.6.0';
 const ROOT = __dirname;
 const DATA_DIR = path.join(ROOT, 'data');
 const PUBLIC_DIR = path.join(ROOT, 'public');
@@ -265,6 +268,39 @@ function createApp(store) {
   function teacherName(id) {
     const u = id ? store.findOne('users', id) : null;
     return u ? u.name : '';
+  }
+
+  // --- student verification (v1.6.0) --------------------------------------
+  // Four-field identity check: Name, Father's Name, Course, Roll Number —
+  // matched IN THIS ORDER against Admin's registered students; the first
+  // mismatch is reported so the student knows exactly which field is wrong.
+  // Comparison is case-insensitive with whitespace collapsed; course names
+  // are matched to the canonical course list ("cit" -> "CIT").
+  function normalizeField(val) {
+    return String(val == null ? '' : val).trim().replace(/\s+/g, ' ').toLowerCase();
+  }
+  function canonicalCourseName(val) {
+    const v = String(val == null ? '' : val).trim();
+    const c = store.find('courses').find((x) => x.name.toLowerCase() === v.toLowerCase());
+    return c ? c.name : v;
+  }
+  // Returns { student } on a full match (teacher_name included — that IS the
+  // auto-fill), or { errorCode, error } for the first mismatching field.
+  function verifyStudent(input) {
+    const name = normalizeField(input.name);
+    const father = normalizeField(input.father_name);
+    const course = normalizeField(canonicalCourseName(input.course));
+    const roll = normalizeField(input.roll);
+    let candidates = store.find('students');
+    candidates = candidates.filter((s) => normalizeField(s.name) === name);
+    if (!candidates.length) return { errorCode: 'name_wrong', error: 'Your Name is wrong.' };
+    candidates = candidates.filter((s) => normalizeField(s.father_name) === father);
+    if (!candidates.length) return { errorCode: 'father_wrong', error: "Your Father's Name is wrong." };
+    candidates = candidates.filter((s) => normalizeField(s.course) === course);
+    if (!candidates.length) return { errorCode: 'course_wrong', error: 'Your Course is wrong.' };
+    const match = candidates.find((s) => normalizeField(s.roll_number) === roll);
+    if (!match) return { errorCode: 'roll_wrong', error: 'Your Roll Number is wrong.' };
+    return { student: Object.assign({}, match, { teacher_name: teacherName(match.teacher_id) }) };
   }
 
   // --- response helpers -----------------------------------------------------
@@ -546,12 +582,22 @@ function createApp(store) {
     }
 
     // ---- students ----
-    if (method === 'GET' && pathname === '/api/students/lookup') {
-      const roll = (query.roll || '').trim();
-      if (!roll) return sendJson(res, 400, { ok: false, error: 'roll is required' });
-      const s = store.findOne('students', (x) => x.roll_number.toLowerCase() === roll.toLowerCase());
-      if (!s) return sendJson(res, 200, { ok: true, found: false });
-      return sendJson(res, 200, { ok: true, found: true, student: Object.assign({}, s, { teacher_name: teacherName(s.teacher_id) }) });
+    // Four-field verification (v1.6.0) — replaces the old roll-only lookup.
+    // No auth (the terminal has no login). Full match -> 200 verified:true
+    // with the student record; first wrong field -> 200 verified:false with
+    // errorCode + the exact English message. Missing fields -> 400.
+    if (method === 'POST' && pathname === '/api/students/verify') {
+      const b = await readBody(req).catch(() => null);
+      if (!b) return sendJson(res, 400, { ok: false, error: 'invalid JSON' });
+      for (const f of ['name', 'father_name', 'course', 'roll']) {
+        if (typeof b[f] !== 'string' || !b[f].trim()) {
+          return sendJson(res, 400, { ok: false, errorCode: 'fields_required',
+            error: 'Please fill in all four fields: Name, Father\'s Name, Course and Roll Number.' });
+        }
+      }
+      const r = verifyStudent(b);
+      if (r.student) return sendJson(res, 200, { ok: true, verified: true, student: r.student });
+      return sendJson(res, 200, { ok: true, verified: false, errorCode: r.errorCode, error: r.error });
     }
     if (method === 'GET' && pathname === '/api/students') {
       if (!requireAuth(req, res, ['admin', 'principal'])) return;
@@ -589,7 +635,7 @@ function createApp(store) {
       });
       return sendJson(res, 201, { ok: true, student: s });
     }
-    if ((method === 'PUT' || method === 'DELETE') && seg[0] === 'api' && seg[1] === 'students' && seg[2] && seg[2] !== 'import' && seg[2] !== 'lookup') {
+    if ((method === 'PUT' || method === 'DELETE') && seg[0] === 'api' && seg[1] === 'students' && seg[2] && seg[2] !== 'import' && seg[2] !== 'verify') {
       if (!requireAuth(req, res, ['admin'])) return;
       const s = store.findOne('students', seg[2]);
       if (!s) return sendJson(res, 404, { ok: false, error: 'student not found' });

@@ -1,5 +1,6 @@
-// STC Testing System — end-to-end verification script (v1.5.1: real logo,
-// back-to-home, teacher import, fill-in-the-blank, course-wise results).
+// STC Testing System — end-to-end verification script (v1.6.0: four-field
+// student verification, real logo, back-to-home, teacher import,
+// fill-in-the-blank, course-wise results).
 // Usage: 1) wipe the test DB:  rm -f data/stc.sqlite data/*.json
 //        2) start server:      PORT=3102 node server.js   (auto-seeds users/courses on first start)
 //        3) run:               node e2e-test.js [baseUrl]
@@ -11,8 +12,8 @@
 //        (v1.3.0) runs LAST so its extra students/teachers/tests cannot
 //        disturb the count assertions in earlier sections.
 // Covers: separate portal pages + login-only shells + authenticated fragments,
-// role-enforced login, strict roll validation (server + client), unauthenticated
-// API rejection, roll lookup, submission + MCQ auto-score, dedupe, teacher
+// role-enforced login, four-field student verification (server + client),
+// unauthenticated API rejection, submission + MCQ auto-score, dedupe, teacher
 // filtering, grading + send + finalize, monthly report (month field),
 // consolidation lock, principal analytics, CSV import/export, offline-queue +
 // fallback code checks, zero-external-requests check on served files,
@@ -67,7 +68,7 @@ async function main() {
   const h = await req('GET', '/api/health');
   check('health 200 + ok', h.status === 200 && h.json && h.json.ok === true, JSON.stringify(h.json));
   check('db backend reported', h.json && (h.json.db === 'sqlite' || h.json.db === 'json'), h.json && h.json.db);
-  check('version is 1.5.1', h.json && h.json.version === '1.5.1', h.json && h.json.version);
+  check('version is 1.6.0', h.json && h.json.version === '1.6.0', h.json && h.json.version);
   const home = await req('GET', '/');
   check('home is the Student Terminal (institute name + verify form + heading)',
     home.status === 200 && home.text.includes('Super Sys-Tech Computers Centre') &&
@@ -196,17 +197,36 @@ async function main() {
     ditCreate.status === 201 && quizCreate.status === 201,
     'dit ' + ditCreate.status + ', quiz ' + quizCreate.status);
 
-  console.log('\n[5] Roll lookup auto-fill (per-student teacher)');
-  const l1 = await req('GET', '/api/students/lookup?roll=E2E-001');
-  check('lookup E2E-001 found (E2E Student One, DIT, kelash)',
-    l1.json && l1.json.found && l1.json.student.name === 'E2E Student One' && l1.json.student.course === 'DIT' &&
-    l1.json.student.teacher_id === tokens.kelash.id, JSON.stringify(l1.json));
-  const l4 = await req('GET', '/api/students/lookup?roll=E2E-004');
-  check('lookup E2E-004 -> pawan', l4.json && l4.json.found && l4.json.student.teacher_id === tokens.pawan.id);
-  const l2 = await req('GET', '/api/students/lookup?roll=E2E-002');
-  check('lookup E2E-002 -> ashok', l2.json && l2.json.found && l2.json.student.teacher_id === tokens.ashok.id);
-  const lX = await req('GET', '/api/students/lookup?roll=STC-9999-999');
-  check('lookup unknown roll -> found:false', lX.json && lX.json.found === false);
+  console.log('\n[5] Four-field student verification (name/father/course/roll, teacher auto-fill)');
+  const verify = (body) => req('POST', '/api/students/verify', body);
+  const v1 = await verify({ name: 'E2E Student One', father_name: 'E2E Father One', course: 'DIT', roll: 'E2E-001' });
+  check('verify E2E-001 full match (E2E Student One, DIT, kelash auto-filled)',
+    v1.json && v1.json.verified && v1.json.student.name === 'E2E Student One' && v1.json.student.course === 'DIT' &&
+    v1.json.student.teacher_id === tokens.kelash.id && v1.json.student.teacher_name === 'Kelash Kumar', JSON.stringify(v1.json));
+  const vCase = await verify({ name: 'e2e student one', father_name: 'e2e  father  one', course: 'dit', roll: 'e2e-001' });
+  check('verify is case-insensitive + whitespace-tolerant (lowercase "dit" matches "DIT")',
+    vCase.json && vCase.json.verified === true, JSON.stringify(vCase.json));
+  const v4 = await verify({ name: 'E2E Student Four', father_name: 'E2E Father Four', course: 'CIT', roll: 'E2E-004' });
+  check('verify E2E-004 -> pawan', v4.json && v4.json.verified && v4.json.student.teacher_id === tokens.pawan.id);
+  const v2 = await verify({ name: 'E2E Student Two', father_name: 'E2E Father Two', course: 'CIT', roll: 'E2E-002' });
+  check('verify E2E-002 -> ashok', v2.json && v2.json.verified && v2.json.student.teacher_id === tokens.ashok.id);
+  const vName = await verify({ name: 'No Such Student', father_name: 'E2E Father One', course: 'DIT', roll: 'E2E-001' });
+  check('wrong name -> name_wrong + "Your Name is wrong."',
+    vName.json && vName.json.verified === false && vName.json.errorCode === 'name_wrong' && vName.json.error === 'Your Name is wrong.', JSON.stringify(vName.json));
+  const vFather = await verify({ name: 'E2E Student One', father_name: 'Wrong Father', course: 'DIT', roll: 'E2E-001' });
+  check('right name + wrong father -> father_wrong + "Your Father\'s Name is wrong."',
+    vFather.json && vFather.json.verified === false && vFather.json.errorCode === 'father_wrong' && vFather.json.error === "Your Father's Name is wrong.", JSON.stringify(vFather.json));
+  const vCourse = await verify({ name: 'E2E Student One', father_name: 'E2E Father One', course: 'CIT', roll: 'E2E-001' });
+  check('right name/father + wrong course -> course_wrong + "Your Course is wrong."',
+    vCourse.json && vCourse.json.verified === false && vCourse.json.errorCode === 'course_wrong' && vCourse.json.error === 'Your Course is wrong.', JSON.stringify(vCourse.json));
+  const vRoll = await verify({ name: 'E2E Student One', father_name: 'E2E Father One', course: 'DIT', roll: 'E2E-999' });
+  check('right name/father/course + wrong roll -> roll_wrong + "Your Roll Number is wrong."',
+    vRoll.json && vRoll.json.verified === false && vRoll.json.errorCode === 'roll_wrong' && vRoll.json.error === 'Your Roll Number is wrong.', JSON.stringify(vRoll.json));
+  const vEmpty = await verify({ name: 'E2E Student One', father_name: '', course: 'DIT', roll: 'E2E-001' });
+  check('missing field -> 400 fields_required',
+    vEmpty.status === 400 && vEmpty.json && vEmpty.json.errorCode === 'fields_required', JSON.stringify(vEmpty.json));
+  const lOld = await req('GET', '/api/students/lookup?roll=E2E-001');
+  check('old roll-only GET /api/students/lookup is retired (404)', lOld.status === 404, 'got ' + lOld.status);
   // the 4 created students are listed, each with its own assigned teacher
   const sl = await req('GET', '/api/students', null, admin.token);
   const byTeacher = {};
@@ -355,8 +375,8 @@ async function main() {
   const imp1 = await req('POST', '/api/students/import', { csv }, admin.token);
   check('import: 2 imported, 1 row error (bad shift)',
     imp1.json && imp1.json.imported === 2 && (imp1.json.errors || []).length === 1, JSON.stringify(imp1.json));
-  const impL = await req('GET', '/api/students/lookup?roll=STC-2026-102');
-  check('imported quoted-comma name found via lookup', impL.json && impL.json.found && impL.json.student.name === 'Comma, Test');
+  const impL = await verify({ name: 'Comma, Test', father_name: 'Test Father', course: 'CIT', roll: 'STC-2026-102' });
+  check('imported quoted-comma name verifies (full match)', impL.json && impL.json.verified && impL.json.student.name === 'Comma, Test');
   const imp2 = await req('POST', '/api/students/import', { csv }, admin.token);
   check('re-import skips duplicates (2 skipped)', imp2.json && imp2.json.skipped === 2, JSON.stringify(imp2.json));
   // v1.4.2: forgiving import — "Sir " prefix, unpadded hour, lowercase course.
@@ -365,9 +385,9 @@ async function main() {
   const impF = await req('POST', '/api/students/import', { csv: csvF }, admin.token);
   check('forgiving import: Sir prefix + 9:00 AM + lowercase cit -> 1 imported, 0 errors',
     impF.json && impF.json.imported === 1 && (impF.json.errors || []).length === 0, JSON.stringify(impF.json));
-  const impFL = await req('GET', '/api/students/lookup?roll=STC-2026-104');
+  const impFL = await verify({ name: 'Forgiving Test', father_name: 'Test Father', course: 'CIT', roll: 'STC-2026-104' });
   check('forgiving import stored canonical values (CIT, 09:00 AM - 10:00 AM, Ashok Kumar)',
-    impFL.json && impFL.json.found && impFL.json.student.course === 'CIT' &&
+    impFL.json && impFL.json.verified && impFL.json.student.course === 'CIT' &&
     impFL.json.student.shift === '09:00 AM - 10:00 AM' &&
     impFL.json.student.teacher_name === 'Ashok Kumar', JSON.stringify(impFL.json && impFL.json.student));
   const tplCsv = await req('GET', '/students_template.csv');
@@ -464,6 +484,8 @@ async function main() {
   console.log('\n[18] Offline queue + session-clear + fallback + strict UI (code-level)');
   const stuSrc = fs.readFileSync(path.join(__dirname, 'public', 'student.js'), 'utf8');
   const comSrc = fs.readFileSync(path.join(__dirname, 'public', 'common.js'), 'utf8');
+  const srvSrc = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+  const labSrc = fs.readFileSync(path.join(__dirname, 'lab-template.html'), 'utf8');
   const stuHtml = fs.readFileSync(path.join(__dirname, 'public', 'student.html'), 'utf8');
   const teaHtml = fs.readFileSync(path.join(__dirname, 'public', 'teacher.html'), 'utf8');
   const admFrag = fs.readFileSync(path.join(__dirname, 'fragments', 'admin-console.html'), 'utf8');
@@ -475,10 +497,24 @@ async function main() {
   check('client-generated client_id for dedupe', stuSrc.includes('client_id'));
   check('session cleared after submit (sessionStorage.clear)', stuSrc.includes('sessionStorage.clear'));
   check('exam state reset to blank start screen', stuSrc.includes('resetStudent'));
-  check('strict roll error message present (Roman Urdu)',
-    stuSrc.includes('Aapka Roll Number ghalat hai.'));
-  check('student page has NO manual-entry inputs (no stu-name/stu-course fields)',
-    !stuHtml.includes('id="stu-name"') && !stuHtml.includes('id="stu-course"') && !stuHtml.includes('id="stu-teacher"'));
+  check('four-field verify messages are English (all four exact messages in server.js)',
+    srvSrc.includes('Your Name is wrong.') && srvSrc.includes("Your Father's Name is wrong.") &&
+    srvSrc.includes('Your Course is wrong.') && srvSrc.includes('Your Roll Number is wrong.'));
+  check('lab app has the SAME four English messages',
+    labSrc.includes('Your Name is wrong.') && labSrc.includes("Your Father's Name is wrong.") &&
+    labSrc.includes('Your Course is wrong.') && labSrc.includes('Your Roll Number is wrong.'));
+  check('student.js posts to /api/students/verify and shows the server message',
+    stuSrc.includes('/api/students/verify') && stuSrc.includes('d.error'));
+  check('no Roman Urdu verify message remains (student.js + lab template)',
+    !stuSrc.includes('Aapka Roll Number ghalat hai.') && !labSrc.includes('Aapka Roll Number ghalat hai.'));
+  check('student page HAS the four verify fields (stu-name/stu-father/stu-course/stu-roll)',
+    stuHtml.includes('id="stu-name"') && stuHtml.includes('id="stu-father"') &&
+    stuHtml.includes('id="stu-course"') && stuHtml.includes('id="stu-roll"'));
+  check('course is a free-text input, not a dropdown',
+    /id="stu-course"[^>]*type="text"/.test(stuHtml));
+  check('lab app HAS the same four verify fields',
+    labSrc.includes('id="stu-name"') && labSrc.includes('id="stu-father"') &&
+    labSrc.includes('id="stu-course"') && labSrc.includes('id="stu-roll"'));
   check('student page has verify + read-only details flow',
     stuHtml.includes('stu-verify-form') && stuHtml.includes('stu-details-body') && stuHtml.includes('stu-confirm'));
   check('teacher fallback logic present (teachersForCourse + DIT fallback)',
@@ -548,14 +584,14 @@ async function main() {
     imp3.json && imp3.json.imported === 2 && (imp3.json.errors || []).length === 1, JSON.stringify(imp3.json));
   check('unknown-teacher error names row 3 + the teacher name',
     (imp3.json.errors || []).some((e) => e.row === 3 && /No Such Teacher/.test(e.error)), JSON.stringify(imp3.json.errors));
-  const l201 = await req('GET', '/api/students/lookup?roll=STC-2026-201');
+  const l201 = await verify({ name: 'Import By Username', father_name: 'Imp Father', course: 'DIT', roll: 'STC-2026-201' });
   check('teacher matched by USERNAME (kelash) assigns that teacher',
-    l201.json && l201.json.found && l201.json.student.teacher_id === tokens.kelash.id, JSON.stringify(l201.json));
-  const l203 = await req('GET', '/api/students/lookup?roll=STC-2026-203');
+    l201.json && l201.json.verified && l201.json.student.teacher_id === tokens.kelash.id, JSON.stringify(l201.json));
+  const l203 = await verify({ name: 'Import By Name', father_name: 'Imp Father', course: 'CIT', roll: 'STC-2026-203' });
   check('teacher matched by FULL NAME (Ashok Kumar) assigns that teacher',
-    l203.json && l203.json.found && l203.json.student.teacher_id === tokens.ashok.id, JSON.stringify(l203.json));
-  const l202 = await req('GET', '/api/students/lookup?roll=STC-2026-202');
-  check('unknown-teacher row was NOT imported', l202.json && l202.json.found === false);
+    l203.json && l203.json.verified && l203.json.student.teacher_id === tokens.ashok.id, JSON.stringify(l203.json));
+  const l202 = await verify({ name: 'Import Bad Teacher', father_name: 'Imp Father', course: 'DIT', roll: 'STC-2026-202' });
+  check('unknown-teacher row was NOT imported', l202.json && l202.json.verified === false && l202.json.errorCode === 'name_wrong');
 
   // --- 3b. Teacher CSV import (auto username, default password, duplicate rejection) ---
   const tTpl = await req('GET', '/teachers_template.csv');
