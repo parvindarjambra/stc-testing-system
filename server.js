@@ -7,6 +7,11 @@
 // /principal. Staff consoles are served as authenticated fragments from
 // ./fragments (never static), so no console content is visible without login.
 // Students can only test with a roll number registered by Admin.
+// USB SYNC (v1.4.0): offline labs with no network at all get a standalone
+// lab app (GET /api/lab-pack, Admin only) — a single self-contained HTML
+// file with students + tests but NO answer keys. Submissions come back on
+// a USB stick and are imported via POST /api/lab-import (Admin only),
+// which auto-grades MCQs server-side and dedupes by client_id.
 
 'use strict';
 
@@ -17,7 +22,7 @@ const crypto = require('crypto');
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = '0.0.0.0';
-const VERSION = '1.3.2';
+const VERSION = '1.4.0';
 const ROOT = __dirname;
 const DATA_DIR = path.join(ROOT, 'data');
 const PUBLIC_DIR = path.join(ROOT, 'public');
@@ -776,6 +781,97 @@ function createApp(store) {
       }
       const updated = store.update('submissions', s.id, { status: 'final' });
       return sendJson(res, 200, { ok: true, submission: updated });
+    }
+
+    // ---- USB lab sync (offline labs, no network) ----
+    // Lab pack: every student + every test, with questions stripped of
+    // answer keys (stripAnswers removes MCQ `correct` and FIB
+    // suggested_answer). The pack is embedded into lab-template.html and
+    // downloaded as STC-Lab.html — a single file the lab laptops open
+    // with a double-click. Admin only: the pack holds the student list.
+    if (method === 'GET' && pathname === '/api/lab-pack') {
+      if (!requireAuth(req, res, ['admin'])) return;
+      let template;
+      try {
+        template = fs.readFileSync(path.join(ROOT, 'lab-template.html'), 'utf8');
+      } catch (e) {
+        return sendJson(res, 500, { ok: false, error: 'lab template missing' });
+      }
+      const marker = '/*__STC_LAB_PACK__*/ null';
+      if (!template.includes(marker)) {
+        return sendJson(res, 500, { ok: false, error: 'lab template is corrupt (pack marker missing)' });
+      }
+      const pack = {
+        pack_id: newId(), generated_at: nowIso(), version: VERSION,
+        students: store.find('students').map((s) => ({
+          roll_number: s.roll_number, name: s.name, father_name: s.father_name || '',
+          course: s.course, shift: s.shift,
+          teacher_id: s.teacher_id || null, teacher_name: teacherName(s.teacher_id),
+        })),
+        tests: store.find('tests').map(stripAnswers),
+      };
+      // Escape '<' so no student/test text can break out of the <script> block.
+      const html = template.replace(marker, JSON.stringify(pack).replace(/</g, '\\u003c'));
+      res.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Content-Disposition': 'attachment; filename="STC-Lab.html"',
+      });
+      res.end(html);
+    }
+    // Lab import: submissions JSON exported from a lab laptop (USB stick).
+    // Accepts the lab app's envelope { submissions: [...] } or a bare array.
+    // Each submission is validated like an online submit (test must exist,
+    // roll must be registered — the registered record is the truth), MCQs
+    // are auto-graded from the server's key, and records are inserted with
+    // the EXACT online submission schema (status 'submitted'), so teacher
+    // grading, send-to-admin, finalize and the monthly report work unchanged.
+    // Dedupe by client_id: re-importing the same USB file is safe.
+    if (method === 'POST' && pathname === '/api/lab-import') {
+      if (!requireAuth(req, res, ['admin'])) return;
+      const b = await readBody(req).catch(() => null);
+      const list = Array.isArray(b) ? b : (b && Array.isArray(b.submissions) ? b.submissions : null);
+      if (!list) return sendJson(res, 400, { ok: false, error: 'submissions array is required' });
+      let imported = 0, duplicates = 0;
+      const errors = [];
+      for (let i = 0; i < list.length; i++) {
+        const item = list[i] || {};
+        const label = 'submission ' + (i + 1) + (item.client_id ? ' (' + item.client_id + ')' : '');
+        if (typeof item.client_id !== 'string' || !item.client_id.trim()) {
+          errors.push({ index: i, error: label + ': client_id is required' }); continue;
+        }
+        if (store.findOne('submissions', (s) => s.client_id === item.client_id)) { duplicates++; continue; }
+        const test = item.test_id ? store.findOne('tests', item.test_id) : null;
+        if (!test) { errors.push({ index: i, client_id: item.client_id, error: label + ': test not found' }); continue; }
+        const roll = item.student && item.student.roll_number;
+        if (!roll) { errors.push({ index: i, client_id: item.client_id, error: label + ': student roll_number is required' }); continue; }
+        const registered = store.findOne('students', (x) =>
+          x.roll_number.toLowerCase() === String(roll).trim().toLowerCase());
+        if (!registered) { errors.push({ index: i, client_id: item.client_id, error: label + ': roll_not_registered (' + roll + ')' }); continue; }
+        if (!Array.isArray(item.answers)) { errors.push({ index: i, client_id: item.client_id, error: label + ': answers must be an array' }); continue; }
+        const g = gradeSubmission(test, item.answers);
+        // Date + submitted_at come from the lab record (when the student
+        // actually took the test), so a Monday test counts on Monday even
+        // if the USB import happens later. Fall back to today/now when
+        // missing or invalid. (Tests run 7 AM–7 PM, so the UTC date in the
+        // ISO timestamp always matches the local test date.)
+        let submittedAt = nowIso();
+        if (typeof item.submitted_at === 'string' && !isNaN(Date.parse(item.submitted_at))) {
+          submittedAt = new Date(item.submitted_at).toISOString();
+        }
+        const date = isValidDate(submittedAt.slice(0, 10)) ? submittedAt.slice(0, 10) : todayStr();
+        store.insert('submissions', {
+          id: newId(), client_id: item.client_id, student_roll: registered.roll_number,
+          student_name: registered.name, father_name: registered.father_name || '',
+          course: registered.course, shift: registered.shift,
+          teacher_id: registered.teacher_id || null, test_id: test.id, test_title: test.title,
+          date, answers: item.answers,
+          mcq_score: g.mcq_score, mcq_max: g.mcq_max, theory_marks: {}, theory_max: g.theory_max,
+          total: g.mcq_score, max_total: g.max_total, status: 'submitted',
+          submitted_at: submittedAt, graded_at: null, locked: 0,
+        });
+        imported++;
+      }
+      return sendJson(res, 200, { ok: true, imported, duplicates, errors });
     }
 
     // ---- monthly report ----

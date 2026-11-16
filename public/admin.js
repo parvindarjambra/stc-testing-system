@@ -552,6 +552,46 @@ function importTeachersCsv() {
   reader.readAsText(file);
 }
 
+/* ----- USB Lab Sync (offline labs, no network) ----- */
+/* Lab Pack download: the server embeds students + tests (no answer keys)
+   into the standalone lab app and serves it as STC-Lab.html. */
+function downloadLabPack() {
+  downloadCsv('/api/lab-pack', 'STC-Lab.html');
+}
+
+/* Import one or more lab submission files from a USB stick. Each file is
+   posted separately so the summary can show per-file results. */
+async function importLabFiles() {
+  const files = $('lab-files').files;
+  if (!files || !files.length) { toast('Choose one or more lab submission (.json) files first.', false); return; }
+  const box = $('lab-import-result');
+  box.innerHTML = '<p class="muted">Importing ' + files.length + ' file(s)...</p>';
+  let totalImported = 0, totalDupes = 0;
+  let html = '';
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    try {
+      const text = await file.text();
+      let envelope;
+      try { envelope = JSON.parse(text); }
+      catch (e) { throw new Error('not a valid JSON file'); }
+      const d = await api('/api/lab-import', { method: 'POST', body: envelope });
+      totalImported += d.imported || 0;
+      totalDupes += d.duplicates || 0;
+      html += '<p><strong>' + esc(file.name) + ':</strong> imported ' + (d.imported || 0) +
+        ', duplicates ' + (d.duplicates || 0) + ', errors ' + ((d.errors || []).length) + '</p>';
+      if (d.errors && d.errors.length) {
+        html += '<ul>' + d.errors.map((er) => '<li class="err">' + esc(er.error) + '</li>').join('') + '</ul>';
+      }
+    } catch (err) {
+      html += '<p><strong>' + esc(file.name) + ':</strong> <span class="err">failed — ' + esc(err.message) + '</span></p>';
+    }
+  }
+  html = '<p><strong>Total imported:</strong> ' + totalImported + ' &nbsp; <strong>Duplicates skipped:</strong> ' + totalDupes + '</p>' + html;
+  box.innerHTML = html;
+  toast('Lab import done: ' + totalImported + ' imported, ' + totalDupes + ' duplicates.', true);
+}
+
 /* Course-wise result sheet (print): grouped by course, institute header
    with the real logo + signature lines (via printSheet). */
 async function printCourseWiseSheet() {
@@ -678,6 +718,9 @@ function initAdmin() {
   $('teacher-form').addEventListener('submit', saveTeacher);
   $('tc-cancel').addEventListener('click', () => { openTeacherForm(null); $('teacher-form').reset(); });
   $('tc-csv-import').addEventListener('click', importTeachersCsv);
+
+  $('lab-export').addEventListener('click', downloadLabPack);
+  $('lab-import-btn').addEventListener('click', importLabFiles);
 }
 
 

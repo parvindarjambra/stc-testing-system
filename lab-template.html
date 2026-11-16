@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<!-- =====================================================================
+     STC Testing System — Offline Lab App (USB sync, v1.4.0).
+     Super Sys-Tech Computers Centre, Umerkot.
+
+     SELF-CONTAINED: inline CSS + inline JS, ZERO external references,
+     ZERO network calls. Works from file:// on double-click — no server,
+     no Node.js, no Wi-Fi needed on lab laptops.
+
+     This is a TEMPLATE. Admin exports the real file (STC-Lab.html) from
+     the Admin portal: the server embeds the lab pack (students + tests)
+     into LAB_PACK below. The pack NEVER contains answer keys: MCQ
+     correct answers and fill-in-the-blank suggested answers stay on the
+     Admin PC — MCQ auto-grading happens server-side at USB import time,
+     so a student can never find answers via view-source.
+
+     Students test fully offline; submissions are saved in this browser's
+     localStorage. In the evening the teacher clicks "Export (Teacher)"
+     and saves the JSON file to a USB stick for Admin to import.
+     ===================================================================== -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>STC Lab Exam — Offline</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2Fsvg%27%20viewBox%3D%270%200%2064%2064%27%3E%3Crect%20width%3D%2764%27%20height%3D%2764%27%20rx%3D%2714%27%20fill%3D%27%23059669%27%2F%3E%3Ctext%20x%3D%2732%27%20y%3D%2742%27%20font-family%3D%27Arial%2Csans-serif%27%20font-size%3D%2724%27%20font-weight%3D%27bold%27%20fill%3D%27white%27%20text-anchor%3D%27middle%27%3ESTC%3C%2Ftext%3E%3C%2Fsvg%3E">
+<style>
+/* Inline theme — same STC palette as the main system (navy / emerald / teal). */
+* { box-sizing: border-box; }
+body { margin: 0; font-family: -apple-system, "Segoe UI", Arial, sans-serif; background: #f8fafc; color: #1e293b; }
+.hidden { display: none !important; }
+.site-header { background: #0f172a; color: #fff; padding: 14px 20px; }
+.header-inner { max-width: 960px; margin: 0 auto; display: flex; align-items: center; gap: 14px; }
+.header-badge { width: 52px; height: 52px; border-radius: 12px; background: linear-gradient(135deg, #059669, #0d9488, #0e7490); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 20px; flex-shrink: 0; }
+.site-header h1 { margin: 0; font-size: 20px; }
+.tagline { margin: 2px 0 0; color: #94a3b8; font-size: 13px; }
+.topbar { background: #fff; border-bottom: 1px solid #e2e8f0; padding: 10px 20px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.topbar-title { font-weight: 700; color: #0f172a; margin-right: auto; }
+.offline-pill { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 600; }
+.saved-badge { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 600; }
+main { max-width: 960px; margin: 0 auto; padding: 20px; }
+.card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06); }
+.card.narrow { max-width: 560px; margin-left: auto; margin-right: auto; }
+h2 { margin-top: 0; color: #0f172a; }
+.muted { color: #64748b; font-size: 14px; }
+label { display: block; font-weight: 600; font-size: 14px; margin-bottom: 6px; }
+input[type="text"], input[type="number"], textarea, select { width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 15px; font-family: inherit; margin-top: 4px; }
+input[type="text"]:focus, textarea:focus { outline: 2px solid #2dd4bf; border-color: #2dd4bf; }
+.btn { display: inline-block; padding: 9px 16px; border-radius: 8px; border: 1px solid #cbd5e1; background: #fff; color: #0f172a; font-size: 14px; font-weight: 600; cursor: pointer; text-decoration: none; }
+.btn:hover { background: #f1f5f9; }
+.btn-primary { background: linear-gradient(135deg, #059669, #0d9488, #0e7490); color: #fff; border: none; }
+.btn-primary:hover { filter: brightness(1.08); }
+.btn-big { padding: 12px 22px; font-size: 16px; }
+.btn-small { padding: 6px 12px; font-size: 13px; }
+.btn-danger { color: #b91c1c; border-color: #fecaca; }
+.btn-danger:hover { background: #fef2f2; }
+.btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+.lookup-msg { min-height: 20px; font-size: 14px; margin: 8px 0; }
+.lookup-msg.err { color: #b91c1c; font-weight: 600; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #e2e8f0; }
+th { color: #475569; font-weight: 600; width: 38%; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+.test-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; }
+.test-card h3 { margin: 0 0 8px; font-size: 17px; }
+.badge { display: inline-block; font-size: 12px; font-weight: 700; border-radius: 999px; padding: 3px 10px; margin-right: 6px; }
+.badge-monthly { background: #fef3c7; color: #92400e; }
+.badge-daily { background: #dbeafe; color: #1e40af; }
+.test-meta { display: block; color: #64748b; font-size: 13px; margin: 8px 0 12px; }
+.exam-head { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.exam-head h2 { margin: 0; flex: 1; }
+.timer { font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; background: #0f172a; color: #fff; border-radius: 10px; padding: 6px 14px; }
+.timer.danger { background: #b91c1c; }
+.palette { display: flex; flex-wrap: wrap; gap: 6px; margin: 14px 0; }
+.pal-dot { width: 36px; height: 36px; border-radius: 8px; border: 1px solid #cbd5e1; background: #fff; font-weight: 700; cursor: pointer; }
+.pal-dot.answered { background: #059669; border-color: #059669; color: #fff; }
+.pal-dot.current { outline: 2px solid #0e7490; outline-offset: 1px; }
+.question-block { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+.question-block.current { border-color: #2dd4bf; box-shadow: 0 0 0 2px #ccfbf1; }
+.q-head { font-weight: 600; margin-bottom: 10px; }
+.q-marks { float: right; background: #f1f5f9; border-radius: 999px; padding: 2px 10px; font-size: 12px; color: #475569; }
+.opt { display: block; padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 6px; cursor: pointer; font-weight: 400; }
+.opt:hover { background: #f8fafc; }
+.opt input { margin-right: 8px; }
+.exam-actions { margin-top: 16px; }
+.toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #0f172a; color: #fff; padding: 12px 20px; border-radius: 10px; font-size: 14px; z-index: 50; max-width: 90vw; text-align: center; }
+.toast.ok { background: #047857; }
+.toast.err { background: #b91c1c; }
+.login-badge { font-size: 34px; }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="header-inner">
+    <div class="header-badge">STC</div>
+    <div>
+      <h1>Super Sys-Tech Computers Centre</h1>
+      <p class="tagline">Offline Lab Exam &nbsp;|&nbsp; Empowering Skills Since 1997, Umerkot</p>
+    </div>
+  </div>
+</header>
+
+<nav class="topbar">
+  <span class="topbar-title">Lab Exam (Offline)</span>
+  <span class="offline-pill">Offline — no internet needed</span>
+  <span id="saved-badge" class="saved-badge hidden"></span>
+  <button id="btn-export" class="btn btn-small" type="button" title="Teacher: download this laptop's saved submissions as a JSON file for the USB stick">Export (Teacher)</button>
+  <button id="btn-clear" class="btn btn-small btn-danger" type="button" title="Teacher only: delete the saved submissions on this laptop AFTER Admin has confirmed the import">Clear saved</button>
+</nav>
+
+<div id="toast" class="toast hidden" role="alert"></div>
+
+<main id="main">
+
+  <!-- No pack (raw template opened by mistake) -->
+  <div id="lab-nopack" class="card narrow hidden">
+    <h2>No exam data in this file</h2>
+    <p>This file has no student list or tests in it. Please use the <strong>STC-Lab.html</strong> file exported by Admin from the Admin portal (USB Lab Sync).</p>
+  </div>
+
+  <!-- Step 1: roll number verification (strict — pack list only) -->
+  <div id="stu-start" class="card narrow hidden">
+    <div class="login-badge">&#9998;</div>
+    <h2>Student Exam — Start</h2>
+    <p class="muted">Enter your roll number. Only roll numbers registered by Admin can take a test.</p>
+    <form id="stu-verify-form">
+      <label>Roll Number
+        <input id="stu-roll" type="text" required placeholder="Enter your roll number" autocomplete="off">
+      </label>
+      <p id="stu-verify-msg" class="lookup-msg"></p>
+      <button class="btn btn-primary btn-big" type="submit">Verify Roll Number</button>
+    </form>
+  </div>
+
+  <!-- Step 1b: registered details (read-only — from the lab pack) -->
+  <div id="stu-details" class="card narrow hidden">
+    <h2>Your Registered Details</h2>
+    <p class="muted">Please check — these come from the Admin's student list and cannot be changed here. If anything is wrong, tell your teacher or Admin.</p>
+    <div id="stu-details-body"></div>
+    <div class="btn-row">
+      <button class="btn btn-primary btn-big" type="button" id="stu-confirm">Confirm &amp; Show My Tests</button>
+      <button class="btn" type="button" id="stu-change-roll">Change roll number</button>
+    </div>
+  </div>
+
+  <!-- Step 2: test picker -->
+  <div id="stu-tests" class="hidden">
+    <h2>Select Your Test</h2>
+    <p id="stu-tests-who" class="muted"></p>
+    <div id="stu-test-list" class="card-grid"></div>
+    <p><button class="btn" type="button" id="stu-tests-back">Back — change details</button></p>
+  </div>
+
+  <!-- Step 3: exam screen -->
+  <div id="stu-exam" class="hidden">
+    <div class="exam-head">
+      <h2 id="exam-title"></h2>
+      <div id="exam-timer" class="timer">--:--</div>
+    </div>
+    <p id="exam-meta" class="muted"></p>
+    <div id="exam-palette" class="palette"></div>
+    <div id="exam-questions"></div>
+    <div class="exam-actions">
+      <button class="btn btn-primary btn-big" type="button" id="exam-submit">Submit Exam</button>
+      <p class="muted">Your exam submits automatically when time runs out. Your answers are saved on this laptop only.</p>
+    </div>
+  </div>
+
+  <!-- Step 4: saved confirmation (no scores — grading happens on the Admin PC after USB import) -->
+  <div id="stu-result" class="card narrow hidden">
+    <h2>Answers Saved</h2>
+    <div id="stu-result-body"></div>
+    <p class="muted">Your session has been cleared. The next student can start fresh.</p>
+    <button class="btn btn-primary" type="button" id="stu-result-done">Start Next Student</button>
+  </div>
+
+</main>
+
+<script>
+'use strict';
+/* Lab pack embedded by the server at export time (Admin portal -> USB Lab
+   Sync -> Export Lab Pack). The pack contains students + tests WITHOUT any
+   answer keys. If this file is opened without a pack, LAB_PACK is null. */
+var LAB_PACK = /*__STC_LAB_PACK__*/ null;
+
+/* ---------------- helpers (self-contained copies of the main app's) ---------------- */
+var $ = function (id) { return document.getElementById(id); };
+var esc = function (s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+};
+function monthName(ym) {
+  if (!ym || !/^\d{4}-\d{2}$/.test(ym)) return '';
+  var names = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
+    'August', 'September', 'October', 'November', 'December'];
+  var y = ym.slice(0, 4), m = parseInt(ym.slice(5, 7), 10);
+  return names[m - 1] ? names[m - 1] + ' ' + y : ym;
+}
+function testLabel(t) {
+  if (t.type === 'monthly-test' && t.month) {
+    if (t.title.indexOf(monthName(t.month)) !== -1) return t.title;
+    return t.title + ' — ' + monthName(t.month);
+  }
+  return t.title;
+}
+function toast(msg, ok) {
+  var el = $('toast');
+  el.textContent = msg;
+  el.className = 'toast ' + (ok ? 'ok' : 'err');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(function () { el.className = 'toast hidden'; }, 6000);
+}
+
+/* ---------------- state ---------------- */
+var S = { student: null, test: null, answers: {}, timerId: null, endsAt: 0, currentQ: 0 };
+
+/* ---------------- saved submissions (localStorage) ---------------- */
+var SUBS_KEY = 'stc_lab_submissions_v1';
+function getSaved() {
+  try { var v = JSON.parse(localStorage.getItem(SUBS_KEY) || '[]'); return Array.isArray(v) ? v : []; }
+  catch (e) { return []; }
+}
+function setSaved(list) {
+  localStorage.setItem(SUBS_KEY, JSON.stringify(list));
+  updateSavedBadge();
+}
+function updateSavedBadge() {
+  var n = getSaved().length;
+  var badge = $('saved-badge');
+  badge.textContent = n ? (n + ' submission' + (n === 1 ? '' : 's') + ' saved on this laptop') : '';
+  badge.classList.toggle('hidden', n === 0);
+}
+
+/* ---------------- Step 1: strict roll validation against the pack ---------------- */
+function findStudent(roll) {
+  var r = String(roll || '').trim().toLowerCase();
+  if (!r) return null;
+  var list = (LAB_PACK && LAB_PACK.students) || [];
+  for (var i = 0; i < list.length; i++) {
+    if (String(list[i].roll_number).toLowerCase() === r) return list[i];
+  }
+  return null;
+}
+function initLab() {
+  if (!LAB_PACK || !Array.isArray(LAB_PACK.students) || !Array.isArray(LAB_PACK.tests)) {
+    $('lab-nopack').classList.remove('hidden');
+    $('btn-export').disabled = true;
+    $('btn-clear').disabled = true;
+    return;
+  }
+  $('stu-start').classList.remove('hidden');
+
+  $('stu-verify-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var roll = $('stu-roll').value.trim();
+    if (!roll) return;
+    var msg = $('stu-verify-msg');
+    var st = findStudent(roll);
+    if (!st) {
+      msg.textContent = 'Ye roll number list mein nahi hai — Admin se rabta karein.';
+      msg.className = 'lookup-msg err';
+      return;
+    }
+    S.student = {
+      roll_number: st.roll_number, name: st.name, father_name: st.father_name || '',
+      course: st.course, shift: st.shift,
+      teacher_id: st.teacher_id || null, teacher_name: st.teacher_name || ''
+    };
+    $('stu-details-body').innerHTML =
+      '<table><tr><th>Roll Number</th><td>' + esc(S.student.roll_number) + '</td></tr>' +
+      '<tr><th>Student Name</th><td>' + esc(S.student.name) + '</td></tr>' +
+      '<tr><th>Father\'s Name</th><td>' + esc(S.student.father_name) + '</td></tr>' +
+      '<tr><th>Course</th><td>' + esc(S.student.course) + '</td></tr>' +
+      '<tr><th>Shift</th><td>' + esc(S.student.shift) + '</td></tr>' +
+      '<tr><th>Teacher</th><td>' + esc(S.student.teacher_name || '—') + '</td></tr></table>';
+    $('stu-start').classList.add('hidden');
+    $('stu-details').classList.remove('hidden');
+  });
+
+  $('stu-confirm').addEventListener('click', loadTestPicker);
+  $('stu-change-roll').addEventListener('click', function () {
+    S.student = null;
+    $('stu-details').classList.add('hidden');
+    $('stu-roll').value = '';
+    $('stu-verify-msg').textContent = '';
+    $('stu-verify-msg').className = 'lookup-msg';
+    $('stu-start').classList.remove('hidden');
+    $('stu-roll').focus();
+  });
+  $('stu-tests-back').addEventListener('click', function () {
+    $('stu-tests').classList.add('hidden');
+    $('stu-details').classList.remove('hidden');
+  });
+  $('exam-submit').addEventListener('click', function () { submitExam(false); });
+  $('stu-result-done').addEventListener('click', resetStudent);
+  $('btn-export').addEventListener('click', exportSubmissions);
+  $('btn-clear').addEventListener('click', clearSaved);
+  updateSavedBadge();
+}
+
+/* ---------------- Step 2: tests for the student's course ---------------- */
+function loadTestPicker() {
+  $('stu-start').classList.add('hidden');
+  $('stu-details').classList.add('hidden');
+  $('stu-tests').classList.remove('hidden');
+  $('stu-tests-who').textContent = S.student.name + ' (' + S.student.roll_number + ') — ' + S.student.course + ', ' + S.student.shift;
+  var list = $('stu-test-list');
+  var tests = ((LAB_PACK && LAB_PACK.tests) || []).filter(function (t) { return t.course === S.student.course; });
+  if (!tests.length) {
+    list.innerHTML = '<p>No tests found for ' + esc(S.student.course) + '. Please ask your teacher.</p>';
+    return;
+  }
+  list.innerHTML = tests.map(function (t) {
+    var badge = t.type === 'monthly-test'
+      ? '<span class="badge badge-monthly">Monthly Test' + (t.month ? ' — ' + monthName(t.month) : '') + '</span>'
+      : '<span class="badge badge-daily">Daily Quiz</span>';
+    return '<div class="test-card"><h3>' + esc(testLabel(t)) + '</h3>' + badge +
+      '<span class="test-meta">' + esc(t.course) + ' &nbsp;|&nbsp; ' + t.duration_minutes + ' minutes &nbsp;|&nbsp; ' +
+      (t.questions || []).length + ' questions</span>' +
+      '<button class="btn btn-primary" type="button" data-start-test="' + t.id + '">Start Exam</button></div>';
+  }).join('');
+  list.querySelectorAll('[data-start-test]').forEach(function (btn) {
+    btn.addEventListener('click', function () { startExam(btn.getAttribute('data-start-test')); });
+  });
+}
+
+/* ---------------- Step 3: exam screen ---------------- */
+function startExam(testId) {
+  var test = null;
+  var tests = (LAB_PACK && LAB_PACK.tests) || [];
+  for (var i = 0; i < tests.length; i++) { if (String(tests[i].id) === String(testId)) { test = tests[i]; break; } }
+  if (!test || !test.questions) { toast('Could not start exam: test not found.', false); return; }
+  S.test = test;
+  S.answers = {};
+  S.currentQ = 0;
+  $('stu-tests').classList.add('hidden');
+  $('stu-exam').classList.remove('hidden');
+  $('exam-title').textContent = testLabel(test);
+  $('exam-meta').textContent = test.course + ' — ' + (test.type === 'monthly-test' ? 'Monthly Test' : 'Daily Quiz') +
+    ' — ' + test.questions.length + ' questions — ' + test.duration_minutes + ' minutes';
+  renderQuestions();
+  renderPalette();
+  startTimer(test.duration_minutes * 60);
+  window.scrollTo(0, 0);
+}
+
+function renderQuestions() {
+  var box = $('exam-questions');
+  box.innerHTML = S.test.questions.map(function (q, i) {
+    var body = '';
+    if (q.type === 'mcq') {
+      body = (q.options || []).map(function (opt, oi) {
+        return '<label class="opt"><input type="radio" name="q' + i + '" value="' + oi + '"> <span>' + esc(opt) + '</span></label>';
+      }).join('');
+    } else if (q.type === 'fib') {
+      body = '<input type="text" name="q' + i + '" placeholder="Type the missing word(s)..." autocomplete="off">';
+    } else {
+      body = '<textarea name="q' + i + '" rows="4" placeholder="Write your answer here..."></textarea>';
+    }
+    var marks = q.type === 'mcq' ? (q.marks || 1) : (q.max_marks || 0);
+    return '<div class="question-block" id="qb-' + i + '" data-q="' + i + '">' +
+      '<div class="q-head"><span class="q-marks">' + marks + ' mark' + (marks === 1 ? '' : 's') + '</span>' +
+      'Q' + (i + 1) + '. ' + esc(q.question) + '</div>' + body + '</div>';
+  }).join('');
+
+  box.querySelectorAll('input[type="radio"]').forEach(function (r) {
+    r.addEventListener('change', function () {
+      var i = parseInt(r.name.slice(1), 10);
+      S.answers[i] = parseInt(r.value, 10);
+      setCurrentQ(i);
+      renderPalette();
+    });
+  });
+  box.querySelectorAll('textarea').forEach(function (ta) {
+    ta.addEventListener('input', function () {
+      var i = parseInt(ta.name.slice(1), 10);
+      var v = ta.value.trim();
+      if (v) S.answers[i] = ta.value;
+      else delete S.answers[i];
+      setCurrentQ(i);
+      renderPalette();
+    });
+  });
+  box.querySelectorAll('.question-block input[type="text"]').forEach(function (inp) {
+    inp.addEventListener('input', function () {
+      var i = parseInt(inp.name.slice(1), 10);
+      var v = inp.value.trim();
+      if (v) S.answers[i] = inp.value;
+      else delete S.answers[i];
+      setCurrentQ(i);
+      renderPalette();
+    });
+  });
+  box.querySelectorAll('.question-block').forEach(function (el) {
+    el.addEventListener('click', function () { setCurrentQ(parseInt(el.getAttribute('data-q'), 10)); });
+  });
+  setCurrentQ(0);
+}
+
+function isAnswered(i) {
+  var a = S.answers[i];
+  return a !== undefined && a !== null && String(a).trim() !== '';
+}
+
+function renderPalette() {
+  var pal = $('exam-palette');
+  pal.innerHTML = S.test.questions.map(function (q, i) {
+    return '<button type="button" class="pal-dot' + (isAnswered(i) ? ' answered' : '') + (i === S.currentQ ? ' current' : '') +
+      '" data-pal="' + i + '">' + (i + 1) + '</button>';
+  }).join('') +
+    '<span class="muted" style="align-self:center;margin-left:8px">Green = answered. Click a number to jump.</span>';
+  pal.querySelectorAll('[data-pal]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var i = parseInt(b.getAttribute('data-pal'), 10);
+      setCurrentQ(i);
+      var el = $('qb-' + i);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      renderPalette();
+    });
+  });
+}
+
+function setCurrentQ(i) {
+  S.currentQ = i;
+  document.querySelectorAll('.question-block').forEach(function (el) {
+    el.classList.toggle('current', parseInt(el.getAttribute('data-q'), 10) === i);
+  });
+  document.querySelectorAll('.pal-dot').forEach(function (el) {
+    el.classList.toggle('current', parseInt(el.getAttribute('data-pal'), 10) === i);
+  });
+}
+
+/* Countdown timer — auto-submits at zero. */
+function startTimer(totalSeconds) {
+  stopTimer();
+  S.endsAt = Date.now() + totalSeconds * 1000;
+  var tick = function () {
+    var left = Math.max(0, Math.round((S.endsAt - Date.now()) / 1000));
+    var mm = String(Math.floor(left / 60)).padStart(2, '0');
+    var ss = String(left % 60).padStart(2, '0');
+    var el = $('exam-timer');
+    el.textContent = mm + ':' + ss;
+    el.classList.toggle('danger', left <= 300 && left > 0);
+    if (left <= 0) { stopTimer(); submitExam(true); }
+  };
+  tick();
+  S.timerId = setInterval(tick, 1000);
+}
+function stopTimer() {
+  if (S.timerId) { clearInterval(S.timerId); S.timerId = null; }
+}
+
+/* Submission payload — the SAME shape the online portal sends to
+   POST /api/submissions, plus submitted_at (the import uses it for the
+   submission date, so a test taken on Monday counts on Monday even if
+   the USB import happens later). The server re-validates the roll
+   number and rebuilds name/course/shift/teacher from its own records. */
+function buildSubmissionPayload() {
+  var answers = S.test.questions.map(function (q, i) {
+    return { q: i, answer: isAnswered(i) ? S.answers[i] : (q.type === 'mcq' ? null : '') };
+  });
+  return {
+    client_id: 'c-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
+    student: { roll_number: S.student.roll_number },
+    test_id: S.test.id,
+    answers: answers,
+    submitted_at: new Date().toISOString()
+  };
+}
+
+function submitExam(auto) {
+  if (!S.test) return;
+  if (!auto && !confirm('Submit your answers now? You cannot change them after submit.')) return;
+  stopTimer();
+  $('exam-submit').disabled = true;
+  var payload = buildSubmissionPayload();
+  var saved = getSaved();
+  saved.push(payload);
+  setSaved(saved);
+  showSaved();
+}
+
+/* Saved confirmation — NO scores are shown here: MCQ auto-grading happens
+   on the Admin PC at USB import time (the answer keys never leave it). */
+function showSaved() {
+  $('stu-exam').classList.add('hidden');
+  $('stu-result').classList.remove('hidden');
+  $('stu-result-body').innerHTML =
+    '<table><tr><th>Test</th><td>' + esc(testLabel(S.test)) + '</td></tr>' +
+    '<tr><th>Student</th><td>' + esc(S.student.name) + ' (' + esc(S.student.roll_number) + ')</td></tr>' +
+    '<tr><th>Status</th><td><strong>Saved on this laptop.</strong></td></tr></table>' +
+    '<p class="muted">Your teacher will mark this after it reaches the Admin PC (USB import). ' +
+    'MCQ marks are counted automatically there; theory and fill-in-the-blank answers are marked by your teacher.</p>';
+  // Clear the session immediately so the next student starts blank.
+  S.test = null; S.answers = {}; S.student = null;
+}
+
+function resetStudent() {
+  $('stu-result').classList.add('hidden');
+  $('stu-tests').classList.add('hidden');
+  $('stu-exam').classList.add('hidden');
+  $('stu-details').classList.add('hidden');
+  $('stu-roll').value = '';
+  $('stu-verify-msg').textContent = '';
+  $('stu-verify-msg').className = 'lookup-msg';
+  $('stu-details-body').innerHTML = '';
+  $('exam-submit').disabled = false;
+  S.student = null; S.test = null; S.answers = {};
+  $('stu-start').classList.remove('hidden');
+  $('stu-roll').focus();
+  window.scrollTo(0, 0);
+}
+
+/* ---------------- Teacher export (USB) ---------------- */
+function exportSubmissions() {
+  var saved = getSaved();
+  if (!saved.length) { toast('No submissions saved on this laptop yet.', false); return; }
+  var now = new Date();
+  var pad = function (n) { return String(n).padStart(2, '0'); };
+  var stamp = now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate()) +
+    '-' + pad(now.getHours()) + pad(now.getMinutes());
+  var envelope = {
+    format: 'stc-lab-submissions',
+    version: '1.4.0',
+    pack_id: (LAB_PACK && LAB_PACK.pack_id) || null,
+    exported_at: now.toISOString(),
+    submissions: saved
+  };
+  var blob = new Blob([JSON.stringify(envelope, null, 2)], { type: 'application/json' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'STC-Lab-Submissions-' + stamp + '.json';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(function () { URL.revokeObjectURL(url); }, 5000);
+  toast(saved.length + ' submission' + (saved.length === 1 ? '' : 's') + ' downloaded. Save the file to the USB stick.', true);
+}
+
+function clearSaved() {
+  var saved = getSaved();
+  if (!saved.length) { toast('Nothing saved on this laptop.', false); return; }
+  if (!confirm('TEACHER ONLY: delete the ' + saved.length + ' saved submission(s) on this laptop?\n\nOnly do this AFTER Admin has confirmed the USB import worked. Deleted submissions cannot be recovered.')) return;
+  localStorage.removeItem(SUBS_KEY);
+  updateSavedBadge();
+  toast('Saved submissions cleared from this laptop.', true);
+}
+
+document.addEventListener('DOMContentLoaded', initLab);
+</script>
+</body>
+</html>

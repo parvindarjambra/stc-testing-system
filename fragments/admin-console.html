@@ -10,6 +10,7 @@
     <button class="tab" type="button" data-tab="results">Results</button>
     <button class="tab" type="button" data-tab="monthly">Monthly Reports</button>
     <button class="tab" type="button" data-tab="consolidation">7:30 PM Consolidation</button>
+    <button class="tab" type="button" data-tab="labsync">USB Lab Sync</button>
     <button class="tab" type="button" data-tab="courses">Courses</button>
     <button class="tab" type="button" data-tab="teachers">Teachers</button>
   </aside>
@@ -187,6 +188,28 @@
           <button class="btn hidden" type="button" id="con-export">Export Day CSV</button>
           <button class="btn hidden" type="button" id="con-print">Print Day Sheet</button>
         </div>
+      </div>
+    </div>
+
+    <!-- USB Lab Sync (offline labs, no network) -->
+    <div id="tab-labsync" class="tab-panel hidden">
+      <div class="card">
+        <h3>Lab Pack — Export for Offline Laptops</h3>
+        <p class="muted">Downloads <strong>STC-Lab.html</strong> — one self-contained file with all students and all tests. Copy it to each lab laptop (USB stick). Students double-click it and test fully offline, no Wi-Fi and no server needed. The pack contains <strong>no answer keys</strong> — MCQ marks are counted here, on the Admin PC, at import time.</p>
+        <p class="muted">Export a fresh pack whenever students or tests change, and replace the old file on the laptops.</p>
+        <div class="btn-row">
+          <button class="btn btn-primary btn-big" type="button" id="lab-export">Export Lab Pack (STC-Lab.html)</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Import Lab Submissions (from USB)</h3>
+        <p class="muted">In the evening, each laptop's teacher clicks <strong>Export (Teacher)</strong> in the lab app and saves the JSON file to the USB stick. Select those files here (several at once) and import them. MCQs are auto-graded on import; teachers then grade theory and fill-in-the-blank answers on this Admin PC as usual.</p>
+        <p class="muted">Importing the same file twice is safe — submissions already in the system are counted as duplicates and skipped.</p>
+        <div class="inline-form">
+          <input id="lab-files" type="file" accept=".json,application/json" multiple>
+          <button class="btn btn-primary" type="button" id="lab-import-btn">Import Submissions</button>
+        </div>
+        <div id="lab-import-result" class="import-result"></div>
       </div>
     </div>
 

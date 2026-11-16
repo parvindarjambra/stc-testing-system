@@ -1,6 +1,6 @@
 # STC Testing System — Examination, Quiz & Result Management System
 
-**Version 1.3.2** — the code now lives on GitHub (https://github.com/parvindarjambra/stc-testing-system) with one-click updates: double-click `UPDATE.bat` on the Admin PC, no more ZIP downloads. Laptops need nothing installed — they just open the exam page in the browser (see §1b). Everything from v1.3.1 stays: renamed to **STC Testing System**; the real STC logo in every header (local file, offline); a "Back to Home" button on every portal page; teacher CSV import; fill-in-the-blank questions (teacher-graded, like theory); Admin course-wise results export to Excel (CSV) + printable course-wise result sheets. See TEST_REPORT.md for the full v1.3.2 note.
+**Version 1.4.0** — **USB sync for offline labs**: labs with no network at all get a standalone lab app (`STC-Lab.html`) — students test fully offline, and submissions come back on a USB stick for Admin to import (see §1c). Everything from v1.3.2 stays: the code lives on GitHub (https://github.com/parvindarjambra/stc-testing-system) with one-click updates (double-click `UPDATE.bat` on the Admin PC, no more ZIP downloads); laptops on the LAN need nothing installed — they just open the exam page in the browser (see §1b). Renamed to **STC Testing System**; the real STC logo in every header (local file, offline); a "Back to Home" button on every portal page; teacher CSV import; fill-in-the-blank questions (teacher-graded, like theory); Admin course-wise results export to Excel (CSV) + printable course-wise result sheets. See TEST_REPORT.md for the full v1.4.0 note.
 
 **Super Sys-Tech Computers Centre, Umerkot** (also known as Super City Computer Center)
 *"Empowering Skills Since 1997"*
@@ -100,6 +100,50 @@ hosting). Inside the centre's LAN it is safe.
 (e.g. `set PORT=8080` then run `START.bat`), or edit the `set PORT=3000` line in
 `START.bat`. If port 3000 is already in use on the PC, `START.bat` detects it
 automatically and falls back to port 3001 (all printed URLs then use 3001).
+
+---
+
+## 1c. Offline labs — USB sync (no network at all)
+
+For labs whose laptops have **no Wi-Fi and no LAN** — they cannot reach the
+Admin PC's server. Those laptops use a standalone lab app instead, and data
+moves only on a USB stick.
+
+**The daily USB loop**
+
+1. **Admin exports the Lab Pack** (Admin portal → USB Lab Sync → Export Lab
+   Pack). This downloads **`STC-Lab.html`** — one self-contained file with
+   all students and all tests. Copy it to every lab laptop (USB stick).
+   Export a fresh pack whenever students or tests change.
+2. **Students test fully offline.** Double-click `STC-Lab.html` — no server,
+   no Node.js, no Wi-Fi needed on the laptop. Roll number is checked against
+   the pack (unknown roll numbers are refused), the test runs with its timer,
+   and each submit is saved on that laptop. The screen clears for the next
+   student, exactly like the online portal.
+3. **Evening — teacher exports from each laptop.** In the lab app, the
+   teacher clicks **Export (Teacher)** and saves the JSON file
+   (`STC-Lab-Submissions-<date>.json`) to the USB stick. One file per laptop.
+4. **Admin imports.** Admin portal → USB Lab Sync → Import Lab Submissions:
+   select all the USB files at once and import. MCQs are auto-graded on
+   import. Importing the same file twice is safe — already-imported
+   submissions are counted as duplicates and skipped.
+5. **Teachers grade on the Admin PC** (Teacher portal, their own students
+   only): fill-in-the-blank + theory answers, then **Send to Admin** — the
+   same as online submissions. Admin finalizes as usual; the monthly report
+   includes imported results.
+
+**Rules that keep it safe**
+
+- The lab pack contains **no answer keys** — a student cannot find answers
+  via view-source. MCQ marks are counted on the Admin PC at import time.
+- A test taken on Monday counts on Monday even if the USB import happens
+  later (the submission keeps its own test date).
+- Only clear a laptop's saved submissions (**Clear saved** button) AFTER
+  Admin has confirmed the import worked — deleted submissions cannot be
+  recovered.
+- If you import after running the 7:30 PM consolidation for that date,
+  re-run the consolidation for that date so the new rows join the day sheet
+  (re-running is safe — it never duplicates rows).
 
 ---
 
@@ -372,6 +416,8 @@ makes it work with zero internet.
 | `server.js` | The whole server (single file, commented) |
 | `seed.js` | Demo data (re-runnable, never duplicates) |
 | `e2e-test.js` | End-to-end verification script (see TEST_REPORT.md) |
+| `e2e-sync-test.js` | USB-sync verification: the full offline-lab loop (pack export → lab submissions → import → grading → send → finalize → monthly report) |
+| `lab-template.html` | Template for the standalone offline lab app — Admin exports it filled with the lab pack as `STC-Lab.html` (see §1c). Not served directly; only via the Admin-only `/api/lab-pack` endpoint |
 | `public/` | The web app: 5 portal pages (`index.html`, `student.html`, `teacher.html`, `admin.html`, `principal.html`), 6 JS files (`common.js` + one per portal), `style.css`, `stc-logo.webp` (real STC logo), `students_template.csv`, `teachers_template.csv` |
 | `fragments/` | Staff console markup (teacher/admin/principal) — served only after login with the matching role |
 | `students_template.csv` | Sample student import file (also downloadable in Admin) |
@@ -383,3 +429,5 @@ makes it work with zero internet.
 **Re-verify after any change:** stop the server, delete `data/stc.sqlite`
 (or `data/*.json`), start on a test port (`PORT=3102 node server.js`), then
 run `node e2e-test.js http://127.0.0.1:3102`. It should report 205 PASS, 0 FAIL.
+Then wipe the test DB again and run `node e2e-sync-test.js
+http://127.0.0.1:3102` for the USB-sync loop (see TEST_REPORT.md §v1.4.0).

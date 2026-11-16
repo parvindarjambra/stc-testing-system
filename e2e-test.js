@@ -1,4 +1,4 @@
-// STC Testing System — end-to-end verification script (v1.3.2: real logo,
+// STC Testing System — end-to-end verification script (v1.4.0: real logo,
 // back-to-home, teacher import, fill-in-the-blank, course-wise results).
 // Usage: 1) wipe the test DB:  rm -f data/stc.sqlite data/*.json
 //        2) start server:      PORT=3102 node server.js   (auto-seeds users/courses on first start)
@@ -67,7 +67,7 @@ async function main() {
   const h = await req('GET', '/api/health');
   check('health 200 + ok', h.status === 200 && h.json && h.json.ok === true, JSON.stringify(h.json));
   check('db backend reported', h.json && (h.json.db === 'sqlite' || h.json.db === 'json'), h.json && h.json.db);
-  check('version is 1.3.2', h.json && h.json.version === '1.3.2', h.json && h.json.version);
+  check('version is 1.4.0', h.json && h.json.version === '1.4.0', h.json && h.json.version);
   const home = await req('GET', '/');
   check('landing page serves institute name', home.status === 200 && home.text.includes('Super Sys-Tech Computers Centre'));
   check('landing page serves Principal name', home.text.includes('Ramesh Kumar'));

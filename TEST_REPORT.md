@@ -421,3 +421,36 @@ ships in the repo as public/stc-logo.webp.b64 (base64 text) because the GitHub
 upload path is text-only; UPDATE.ps1 decodes it to stc-logo.webp (round-trip
 md5-verified). Default demo logins are in the public repo, so the system must
 stay LAN-only (see README security note). Version bumped to 1.3.2.
+
+## v1.4.0 (2026-11-16) — USB sync for offline labs
+User picked USB sync (over evening Wi-Fi sync): the centre has 5 labs x 20
+laptops (80+) with NO network at all — no Wi-Fi, no LAN — so data moves only
+by USB stick. Router/hotspot solutions were rejected by the user.
+Build: (1) NEW lab-template.html — a single self-contained offline lab app
+(inline CSS+JS, zero external refs, zero fetch calls, runs from file:// on
+double-click, no Node/server on lab laptops): roll validation against the
+pack, read-only details, test picker, exam screen (timer, palette, MCQ +
+fill-in-the-blank + theory, auto-submit), submit saves to localStorage and
+clears for the next student, Export (Teacher) downloads submissions JSON,
+Clear saved (confirm-guarded, teacher only after Admin confirms import).
+(2) NEW server endpoints (Admin only): GET /api/lab-pack exports the
+template filled with the pack (all students incl. assigned teacher, all
+tests via the existing stripAnswers — NO answer keys anywhere: MCQ
+`correct` and FIB suggested answers never leave the Admin PC) as
+STC-Lab.html; POST /api/lab-import accepts the lab envelope (or a bare
+array), validates test + registered roll like an online submit, auto-grades
+MCQs server-side with gradeSubmission, inserts with the EXACT online
+submission schema (status 'submitted'), and dedupes by client_id (re-import
+is safe; reports imported/duplicates/errors). Submission date comes from
+the lab record's submitted_at, so a Monday test counts on Monday even if
+the USB import happens later. (3) Admin portal: new "USB Lab Sync" sidebar
+tab with Lab Pack export + multi-file Import cards. Teacher grading,
+send-to-admin, finalize and the monthly report are UNCHANGED — teachers
+grade imported submissions on the Admin PC like online ones.
+Tests: existing E2E still 205 PASS, 0 FAIL. NEW e2e-sync-test.js covers the
+full loop (pack auth + no-keys check, import, server-side auto-grade,
+dedupe, bad-row errors, teacher own-students-only grading, send, finalize,
+monthly report): 51 PASS, 0 FAIL. Headless-Chromium smoke test of the REAL
+exported STC-Lab.html (CDP-driven): roll verify incl. unknown-roll
+rejection, full exam, localStorage save, Export download verified as a
+valid envelope, Clear: 22 PASS, 0 FAIL. Version bumped to 1.4.0.
