@@ -1,8 +1,10 @@
-// STC Testing System — USB-sync verification script (v1.10.1: theory always
-// teacher-graded — stored key words ignored at import; auto-lock on the
-// 4th tab switch; v1.10.0: offline labs, import dedupes by (roll, test) —
-// the first submission is kept, later attempts rejected and counted;
-// auto-grading via the shared server path — FIB auto-checked).
+// STC Testing System — USB-sync verification script (v1.10.2: lab teacher
+// PIN — pack export requires a PIN, only its SHA-256 hash is embedded;
+// v1.10.1: theory always teacher-graded — stored key words ignored at
+// import; auto-lock on the 4th tab switch; v1.10.0: offline labs, import
+// dedupes by (roll, test) — the first submission is kept, later attempts
+// rejected and counted; auto-grading via the shared server path — FIB
+// auto-checked).
 // Tests the full offline-lab loop WITHOUT a browser:
 //   seed students + a monthly test via the Admin API -> export the lab pack
 //   (GET /api/lab-pack) -> build lab submissions EXACTLY in the format the
@@ -18,6 +20,8 @@
 // The REAL lab app (STC-Lab.html in a browser) is covered separately by a
 // headless-Chromium smoke test — see TEST_REPORT.md §v1.4.0.
 'use strict';
+
+const crypto = require('crypto');
 
 const BASE = process.argv[2] || 'http://127.0.0.1:3102';
 let pass = 0, fail = 0;
@@ -59,7 +63,7 @@ async function main() {
 
   console.log('\n[1] Health + admin login');
   const h = await req('GET', '/api/health');
-  check('health 200 + version 1.10.1', h.status === 200 && h.json && h.json.version === '1.10.1', h.json && h.json.version);
+  check('health 200 + version 1.10.2', h.status === 200 && h.json && h.json.version === '1.10.2', h.json && h.json.version);
   const admin = await login('admin', 'admin123', 'admin');
   check('admin login', !!(admin && admin.token));
   if (!admin) { console.log('FATAL: admin login failed'); process.exit(1); }
@@ -104,9 +108,17 @@ async function main() {
   check('teacher kelash login', !!(kelashLogin && kelashLogin.token));
   const packTeacher = await req('GET', '/api/lab-pack', null, kelashLogin.token);
   check('lab-pack with teacher token -> 403', packTeacher.status === 403);
-  const pack = await req('GET', '/api/lab-pack', null, admin.token);
-  check('lab-pack with admin token -> 200 HTML', pack.status === 200 && pack.text.includes('<!DOCTYPE html>'),
+  const packNoPin = await req('GET', '/api/lab-pack', null, admin.token);
+  check('lab-pack with admin token but NO PIN -> 400', packNoPin.status === 400, 'got ' + packNoPin.status);
+  const packBadPin = await req('GET', '/api/lab-pack?pin=12', null, admin.token);
+  check('lab-pack with short PIN (12) -> 400', packBadPin.status === 400, 'got ' + packBadPin.status);
+  const pack = await req('GET', '/api/lab-pack?pin=4321', null, admin.token);
+  check('lab-pack with admin token + PIN -> 200 HTML', pack.status === 200 && pack.text.includes('<!DOCTYPE html>'),
     pack.status + ' len=' + pack.text.length);
+  const pinHash4321 = crypto.createHash('sha256').update('4321', 'utf8').digest('hex');
+  check('pack embeds the SHA-256 hash of the PIN',
+    pack.text.includes('"pin_hash":"' + pinHash4321 + '"'), 'hash not in pack');
+  check('pack NEVER contains the plain PIN', !pack.text.includes('4321'), 'plain PIN leaked into the pack');
   check('lab-pack served as download STC-Lab.html',
     (pack.headers.get('content-disposition') || '').includes('STC-Lab.html'));
   check('pack contains both students', pack.text.includes('LAB001') && pack.text.includes('LAB002'));
@@ -130,7 +142,7 @@ async function main() {
   //   submitted_at }, wrapped in the export envelope.
   const nowIso = new Date().toISOString();
   const envelope = {
-    format: 'stc-lab-submissions', version: '1.10.1', pack_id: packId,
+    format: 'stc-lab-submissions', version: '1.10.2', pack_id: packId,
     exported_at: nowIso,
     submissions: [
       {
@@ -285,7 +297,7 @@ async function main() {
   // (Their first submissions are now final / sent_to_admin — the block
   // applies whatever the grading status.)
   const dupEnvelope = {
-    format: 'stc-lab-submissions', version: '1.10.1', pack_id: packId,
+    format: 'stc-lab-submissions', version: '1.10.2', pack_id: packId,
     exported_at: nowIso,
     submissions: [
       {

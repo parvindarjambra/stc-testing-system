@@ -891,6 +891,58 @@ Screenshots: v1100-already-taken.png, v1100-draft-restored.png in the
 project folder (not shipped in the ZIP).
 Version bumped to 1.10.0.
 
+## v1.10.2 (2026-11-16) — Lab teacher PIN (students get no permissions)
+
+User order (19:48 PST): students must get no permissions — in the lab
+app the 'Export (Teacher)' and 'Clear saved' buttons were clickable by
+any student sitting at the laptop. Now both ask for a teacher PIN first.
+
+How it works: when Admin exports a lab pack (USB Lab Sync tab), a
+Teacher PIN is required (new field, 4+ digits, numeric) with the hint
+"Teachers need this PIN to Export or Clear on lab laptops. Tell it to
+the teacher — students must not know it." Exporting without a valid PIN
+shows an inline error at the form (v1.7.0 pattern). The server
+(GET /api/lab-pack?pin=...) validates the PIN (400 without one) and
+embeds ONLY its SHA-256 hash (node:crypto) in the pack — the plain PIN
+never appears in the pack. In the lab app, clicking Export or Clear
+opens a PIN modal; the entered PIN is hashed with a compact ES5 SHA-256
+inside lab-template.html and compared with the pack's hash. Correct PIN
+→ the action proceeds (Clear still shows its confirm dialog afterwards).
+Wrong PIN → "Wrong PIN." and nothing happens. The PIN is checked on
+EVERY click — nothing is remembered, so the next student at the laptop
+inherits no access. Packs exported before v1.10.2 have no PIN hash and
+work WITHOUT a PIN (backward compatible — old packs on laptops keep
+working until the next export replaces them).
+
+Honest limit: the PIN stops casual misuse by students clicking buttons;
+a student who opens and edits the HTML file could bypass it — the lab
+file itself cannot be made tamper-proof.
+
+Tests: E2E 309 PASS, 0 FAIL (was 299; +10 in new §27 — pack without /
+short / non-numeric PIN → 400, pack embeds the SHA-256 hash, plain PIN
+never in the pack, Admin export UI + PIN field + hint + error slot,
+lab SHA-256 + PIN modal + Wrong PIN + per-click gate, old packs work
+without a PIN). e2e-sync-test.js 62 PASS, 0 FAIL (was 58; +4 in §3 —
+no-PIN → 400, short PIN → 400, hash embedded, plain PIN absent).
+Headless-Chromium check (CDP, real server, 0 JS errors, 26/26 checks):
+Admin console PIN field + hint + inline error on empty/short PIN, no
+download without a PIN, pack download with a PIN (hash embedded, plain
+PIN absent); lab app: Export opens the PIN prompt, wrong PIN shows
+"Wrong PIN." with no download, Cancel closes it, correct PIN downloads
+the submissions JSON (holds the saved submission), PIN asked again on
+the next Export, Clear asks for the PIN too, wrong PIN denied with the
+submission still saved, correct PIN + confirm deletes; old pack (hash
+stripped) exports directly with no PIN prompt. Lab smoke of the real
+exported STC-Lab.html (file://, 0 JS errors, 12/12 checks): zero
+external refs, no answer keys in the pack, PIN hash embedded / plain
+PIN absent, wrong roll locks with the English message, submit saves to
+localStorage, result screen shows no scores, Export PIN flow (wrong
+denied, correct downloads), exported JSON imports cleanly with FIB
+auto-graded and theory routed to the teacher.
+Screenshots: v1102-pin-prompt.png, v1102-wrong-pin.png in the project
+folder (not shipped in the ZIP).
+Version bumped to 1.10.2.
+
 ## v1.10.1 (2026-11-16) — Three anti-cheat warnings + theory marking back to the teacher
 
 Two user orders (19:39 and 19:40 PST).

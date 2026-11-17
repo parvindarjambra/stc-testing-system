@@ -33,6 +33,11 @@
 // back to the teacher — theory is NEVER auto-graded (stored key words
 // from v1.9.0 tests are ignored), only MCQ + FIB auto-grade. A submission
 // goes straight to Admin only when it has NO theory questions.
+// v1.10.2: lab teacher PIN — Admin sets a PIN when exporting a lab pack
+// (GET /api/lab-pack?pin=...); the server embeds only its SHA-256 hash
+// (never the plain PIN) and the lab app asks for the PIN before Export
+// (Teacher) or Clear saved. Packs without a hash (pre-v1.10.2) still
+// work without a PIN.
 
 'use strict';
 
@@ -43,7 +48,7 @@ const crypto = require('crypto');
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = '0.0.0.0';
-const VERSION = '1.10.1';
+const VERSION = '1.10.2';
 const ROOT = __dirname;
 const DATA_DIR = path.join(ROOT, 'data');
 const PUBLIC_DIR = path.join(ROOT, 'public');
@@ -951,8 +956,17 @@ function createApp(store) {
     // lab-template.html and downloaded as STC-Lab.html — a single file the
     // lab laptops open with a double-click. Admin only: the pack holds the
     // student list.
+    // v1.10.2: a teacher PIN is required (?pin=...): the lab app asks for
+    // it before Export (Teacher) / Clear saved, so students on the laptop
+    // cannot download or delete submissions. Only the SHA-256 hash of the
+    // PIN is embedded in the pack — the plain PIN never leaves this request.
     if (method === 'GET' && pathname === '/api/lab-pack') {
       if (!requireAuth(req, res, ['admin'])) return;
+      const pin = typeof query.pin === 'string' ? query.pin.trim() : '';
+      if (!/^\d{4,}$/.test(pin)) {
+        return sendJson(res, 400, { ok: false, error: 'teacher PIN is required (4 or more digits)' });
+      }
+      const pinHash = crypto.createHash('sha256').update(pin, 'utf8').digest('hex');
       let template;
       try {
         template = fs.readFileSync(path.join(ROOT, 'lab-template.html'), 'utf8');
@@ -964,7 +978,7 @@ function createApp(store) {
         return sendJson(res, 500, { ok: false, error: 'lab template is corrupt (pack marker missing)' });
       }
       const pack = {
-        pack_id: newId(), generated_at: nowIso(), version: VERSION,
+        pack_id: newId(), generated_at: nowIso(), version: VERSION, pin_hash: pinHash,
         students: store.find('students').map((s) => ({
           roll_number: s.roll_number, name: s.name, father_name: s.father_name || '',
           course: s.course, shift: s.shift,

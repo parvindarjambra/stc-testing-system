@@ -1,7 +1,9 @@
-// STC Testing System — end-to-end verification script (v1.10.1: three
-// anti-cheat warnings before auto-lock (lock on the 4th switch); theory
-// marking back to the teacher — MCQ + FIB auto-graded, theory ALWAYS
-// teacher-graded (stored key words ignored); v1.10.0: one student, one
+// STC Testing System — end-to-end verification script (v1.10.2: lab
+// teacher PIN — pack export requires a PIN, only its SHA-256 hash is
+// embedded, the lab app asks for the PIN before Export / Clear saved;
+// v1.10.1: three anti-cheat warnings before auto-lock (lock on the 4th
+// switch); theory marking back to the teacher — MCQ + FIB auto-graded,
+// theory ALWAYS teacher-graded (stored key words ignored); v1.10.0: one
 // attempt per test (server blocks a second start + second submit; lab
 // import dedupes by roll + test) + lab durability (draft auto-save, restore
 // on reopen); auto-grading — FIB auto-check, fully-auto (MCQ + FIB only)
@@ -32,6 +34,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const BASE = process.argv[2] || 'http://127.0.0.1:3102';
 let pass = 0, fail = 0;
@@ -77,7 +80,7 @@ async function main() {
   const h = await req('GET', '/api/health');
   check('health 200 + ok', h.status === 200 && h.json && h.json.ok === true, JSON.stringify(h.json));
   check('db backend reported', h.json && (h.json.db === 'sqlite' || h.json.db === 'json'), h.json && h.json.db);
-  check('version is 1.10.1', h.json && h.json.version === '1.10.1', h.json && h.json.version);
+  check('version is 1.10.2', h.json && h.json.version === '1.10.2', h.json && h.json.version);
   const home = await req('GET', '/');
   check('home is the Student Terminal (institute name + verify form + heading)',
     home.status === 200 && home.text.includes('Super Sys-Tech Computers Centre') &&
@@ -1020,7 +1023,7 @@ async function main() {
   const staffA = await req('GET', '/api/tests/' + autoAId, null, tokens.kelash.token);
   check('teacher fetch still returns stored key_words (ignored, not auto-graded)',
     staffA.text.indexOf('key_words') !== -1 && staffA.text.indexOf('KEYWORD-PHOTO-SECRET') !== -1);
-  const packA = await req('GET', '/api/lab-pack', null, admin.token);
+  const packA = await req('GET', '/api/lab-pack?pin=9876', null, admin.token);
   check('lab-pack has NO key_words key, NO keyword values, NO model answers',
     packA.text.indexOf('"key_words"') === -1 && packA.text.indexOf('KEYWORD-PHOTO-SECRET') === -1 &&
     packA.text.indexOf('evaporation') === -1 && packA.text.indexOf('MODEL-ANSWER-PHOTOSYNTHESIS-SECRET') === -1 &&
@@ -1097,6 +1100,36 @@ async function main() {
   // Code-level: admin import shows second attempts rejected.
   check('admin import reports second attempts rejected (already_taken)',
     admJs13.includes('already_taken') && admJs13.includes('second attempts rejected'));
+
+  console.log('\n[27] v1.10.2 — lab teacher PIN: pack requires a PIN, hash only, lab asks first');
+  const packNoPin = await req('GET', '/api/lab-pack', null, admin.token);
+  check('lab-pack without PIN -> 400', packNoPin.status === 400, 'got ' + packNoPin.status);
+  const packShortPin = await req('GET', '/api/lab-pack?pin=12', null, admin.token);
+  check('lab-pack with short PIN (12) -> 400', packShortPin.status === 400, 'got ' + packShortPin.status);
+  const packBadPin = await req('GET', '/api/lab-pack?pin=abcd', null, admin.token);
+  check('lab-pack with non-numeric PIN (abcd) -> 400', packBadPin.status === 400, 'got ' + packBadPin.status);
+  const pinHash9876 = crypto.createHash('sha256').update('9876', 'utf8').digest('hex');
+  check('lab-pack with PIN embeds the SHA-256 hash of the PIN (not the PIN)',
+    packA.status === 200 && packA.text.includes('"pin_hash":"' + pinHash9876 + '"'),
+    'status ' + packA.status + ' hash-present=' + packA.text.includes(pinHash9876));
+  check('lab-pack NEVER contains the plain PIN',
+    !packA.text.includes('9876'), 'plain PIN leaked into the pack');
+  // Code-level: Admin export UI.
+  check('admin lab export validates the PIN + passes it as a query param',
+    admJs13.includes("lab-pin") && admJs13.includes('/api/lab-pack?pin=') &&
+    admJs13.includes("showFormError('lab-form-error'"));
+  check('admin console has the Teacher PIN field + hint + inline error slot',
+    admFrag.includes('id="lab-pin"') && admFrag.includes('students must not know it') &&
+    admFrag.includes('id="lab-form-error"'));
+  // Code-level: lab app PIN gate.
+  check('lab app has a SHA-256 + PIN modal + Wrong PIN message',
+    labSrc.includes('function sha256Hex') && labSrc.includes('id="pin-modal"') &&
+    labSrc.includes('Wrong PIN.'));
+  check('lab app gates Export + Clear on the PIN, checked every click',
+    labSrc.includes("requirePin('export')") && labSrc.includes("requirePin('clear')") &&
+    labSrc.includes('sha256Hex(entered) === LAB_PACK.pin_hash'));
+  check('lab app works without a PIN when the pack has no hash (old packs)',
+    labSrc.includes('!LAB_PACK.pin_hash'));
 
   console.log('\n========================================');
   console.log('E2E RESULT: ' + pass + ' PASS, ' + fail + ' FAIL');

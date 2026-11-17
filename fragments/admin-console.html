@@ -206,6 +206,11 @@
         <h3>Lab Pack — Export for Offline Laptops</h3>
         <p class="muted">Downloads <strong>STC-Lab.html</strong> — one self-contained file with all students and all tests. Copy it to each lab laptop (USB stick). Students double-click it and test fully offline, no Wi-Fi and no server needed. The pack contains <strong>no answer keys</strong> — MCQ marks are counted here, on the Admin PC, at import time.</p>
         <p class="muted">Export a fresh pack whenever students or tests change, and replace the old file on the laptops.</p>
+        <div class="form-grid">
+          <label>Teacher PIN <input id="lab-pin" type="text" inputmode="numeric" autocomplete="off" placeholder="4 or more digits" required></label>
+        </div>
+        <p class="muted">Teachers need this PIN to Export or Clear on lab laptops. Tell it to the teacher — students must not know it.</p>
+        <p id="lab-form-error" class="form-error hidden"></p>
         <div class="btn-row">
           <button class="btn btn-primary btn-big" type="button" id="lab-export">Export Lab Pack (STC-Lab.html)</button>
         </div>

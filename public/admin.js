@@ -604,9 +604,18 @@ function importTeachersCsv() {
 
 /* ----- USB Lab Sync (offline labs, no network) ----- */
 /* Lab Pack download: the server embeds students + tests (no answer keys)
-   into the standalone lab app and serves it as STC-Lab.html. */
+   into the standalone lab app and serves it as STC-Lab.html.
+   v1.10.2: a teacher PIN is required — the server embeds only its SHA-256
+   hash, and the lab app asks for the PIN before Export (Teacher) /
+   Clear saved, so students on the laptop cannot use those buttons. */
 function downloadLabPack() {
-  downloadCsv('/api/lab-pack', 'STC-Lab.html');
+  const pin = ($('lab-pin').value || '').trim();
+  if (!/^\d{4,}$/.test(pin)) {
+    showFormError('lab-form-error', 'Teacher PIN is required — 4 or more digits.');
+    return;
+  }
+  hideFormError('lab-form-error');
+  downloadCsv('/api/lab-pack?pin=' + encodeURIComponent(pin), 'STC-Lab.html');
 }
 
 /* Import one or more lab submission files from a USB stick. Each file is
