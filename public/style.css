@@ -444,6 +444,9 @@ tr.clickable:hover td { background: #f0fdfa; }
 .badge { display: inline-block; padding: 3px 11px; border-radius: 9999px; font-size: 12px; font-weight: 700; border: 1px solid transparent; }
 .badge-monthly { background: #DBEAFE; color: #1E40AF; border-color: #bfdbfe; }
 .badge-daily { background: #D1FAE5; color: #065F46; border-color: #a7f3d0; }
+/* v1.9.0: small 'Auto' tag for auto-graded marks (Admin results + teacher grading). */
+.badge-auto { background: #E0E7FF; color: #3730A3; border-color: #c7d2fe; }
+.auto-mark { margin-top: 10px; font-size: 14px; }
 
 .con-result { font-weight: 700; color: var(--emerald-dark); }
 

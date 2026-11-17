@@ -244,7 +244,7 @@ function newFib() {
   return { type: 'fib', question: '', suggested_answer: '', max_marks: 2 };
 }
 function newTheory() {
-  return { type: 'theory', question: '', max_marks: 5, model_answer: '' };
+  return { type: 'theory', question: '', max_marks: 5, model_answer: '', key_words: '' };
 }
 function questionTypeLabel(type) {
   if (type === 'mcq') return 'MCQ';
@@ -270,14 +270,20 @@ function renderBuilderQuestions() {
         q.options.map((o, oi) => '<option value="' + oi + '"' + (q.correct === oi ? ' selected' : '') + '>Option ' + (oi + 1) + '</option>').join('') +
         '</select></label><label>Marks <input type="number" min="1" data-bq="' + i + '" data-field="marks" value="' + q.marks + '"></label></div>';
     } else if (q.type === 'fib') {
-      // Fill in the blank is TEACHER-graded (like theory). The suggested
-      // answer is shown to the teacher while grading; it is never auto-graded.
+      // Fill in the blank (v1.9.0): the correct answer IS the auto-check key —
+      // a matching student answer scores full marks automatically (case does
+      // not matter). Leave it blank and the question stays teacher-graded.
       inner += '<div class="qb-row"><label>Max marks <input type="number" min="1" data-bq="' + i + '" data-field="max_marks" value="' + q.max_marks + '"></label></div>' +
-        '<label>Suggested answer (shown to the teacher while grading — not auto-graded) ' +
+        '<label>Correct answer (auto-checked — leave blank for teacher grading) ' +
         '<input type="text" data-bq="' + i + '" data-field="suggested_answer" value="' + esc(q.suggested_answer || '') + '" placeholder="e.g. Islamabad"></label>';
     } else {
+      // Theory (v1.9.0): key words make the question auto-gradable — marks
+      // come from how many key words appear in the student's answer. No key
+      // words -> the question stays teacher-graded, as before.
       inner += '<div class="qb-row"><label>Max marks <input type="number" min="1" data-bq="' + i + '" data-field="max_marks" value="' + q.max_marks + '"></label></div>' +
-        '<label>Model answer <textarea data-bq="' + i + '" data-field="model_answer" rows="3">' + esc(q.model_answer) + '</textarea></label>';
+        '<label>Model answer <textarea data-bq="' + i + '" data-field="model_answer" rows="3">' + esc(q.model_answer) + '</textarea></label>' +
+        '<label>Key words, comma-separated (for auto-grading — leave blank for teacher grading) ' +
+        '<input type="text" data-bq="' + i + '" data-field="key_words" value="' + esc(q.key_words || '') + '" placeholder="e.g. photosynthesis, sunlight, chlorophyll"></label>';
     }
     inner += '<button class="btn btn-small btn-danger" type="button" data-bq-del="' + i + '">Remove question</button>';
     return '<div class="qb-card">' + inner + '</div>';
@@ -471,9 +477,13 @@ async function loadResultsReview() {
       '<th>MCQ</th><th>Theory / FIB</th><th>Total</th><th>Date</th><th></th></tr>';
     subs.forEach((s) => {
       const theory = Object.keys(s.theory_marks || {}).reduce((a, k) => a + (s.theory_marks[k] || 0), 0);
+      // v1.9.0: a small 'Auto' tag when any FIB/theory mark was auto-graded,
+      // so Admin can judge the auto-grading quality at a glance.
+      const autoTag = (s.auto_marks && Object.keys(s.auto_marks).length)
+        ? ' <span class="badge badge-auto">Auto</span>' : '';
       html += '<tr><td>' + esc(s.student_roll) + '</td><td>' + esc(s.student_name) + '</td><td>' + pillCourse(s.course) +
         '</td><td>' + pillShift(s.shift) + '</td><td>' + esc(s.test_title) + '</td><td>' + s.mcq_score + ' / ' + s.mcq_max +
-        '</td><td>' + theory + ' / ' + s.theory_max + '</td><td><strong>' + s.total + ' / ' + s.max_total +
+        '</td><td>' + theory + ' / ' + s.theory_max + autoTag + '</td><td><strong>' + s.total + ' / ' + s.max_total +
         '</strong></td><td>' + fmtDate(s.date) + '</td><td>' +
         '<button class="btn btn-small btn-emerald" type="button" data-finalize="' + s.id + '">Finalize</button></td></tr>';
     });

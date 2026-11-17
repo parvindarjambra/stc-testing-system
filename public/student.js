@@ -192,7 +192,8 @@ function renderQuestions() {
       ).join('');
     } else if (q.type === 'fib') {
       // Fill in the blank: a short text input for the missing word(s).
-      // Teacher-graded (like theory) — never auto-graded.
+      // v1.9.0: auto-checked against the Admin's key when one was set;
+      // otherwise teacher-graded (like theory).
       body = '<input type="text" name="q' + i + '" placeholder="Type the missing word(s)..." autocomplete="off">';
     } else {
       body = '<textarea name="q' + i + '" rows="4" placeholder="Write your answer here..."></textarea>';

@@ -1,8 +1,10 @@
-// STC Testing System — end-to-end verification script (v1.8.0: anti-cheat
-// tab-switch warning + auto-lock + teacher flag; full-width consoles,
-// inline validation errors, no student back/change; no demo hints
-// in the UI; four-field student verification, real logo, back-to-home,
-// teacher import, fill-in-the-blank, course-wise results).
+// STC Testing System — end-to-end verification script (v1.9.0: auto-grading
+// — FIB auto-check + theory keyword auto-grading, fully-auto submissions
+// straight to Admin, teacher flow kept as fallback; anti-cheat tab-switch
+// warning + auto-lock + teacher flag; full-width consoles, inline validation
+// errors, no student back/change; no demo hints in the UI; four-field
+// student verification, real logo, back-to-home, teacher import,
+// fill-in-the-blank, course-wise results).
 // Usage: 1) wipe the test DB:  rm -f data/stc.sqlite data/*.json
 //        2) start server:      PORT=3102 node server.js   (auto-seeds users/courses on first start)
 //        3) run:               node e2e-test.js [baseUrl]
@@ -70,7 +72,7 @@ async function main() {
   const h = await req('GET', '/api/health');
   check('health 200 + ok', h.status === 200 && h.json && h.json.ok === true, JSON.stringify(h.json));
   check('db backend reported', h.json && (h.json.db === 'sqlite' || h.json.db === 'json'), h.json && h.json.db);
-  check('version is 1.8.0', h.json && h.json.version === '1.8.0', h.json && h.json.version);
+  check('version is 1.9.0', h.json && h.json.version === '1.9.0', h.json && h.json.version);
   const home = await req('GET', '/');
   check('home is the Student Terminal (institute name + verify form + heading)',
     home.status === 200 && home.text.includes('Super Sys-Tech Computers Centre') &&
@@ -662,14 +664,23 @@ async function main() {
   const fs1 = fibSub.json && fibSub.json.submission;
   check('FIB test submit 201', fibSub.status === 201, JSON.stringify(fibSub.json));
   check('MCQ auto-graded from Admin key (2/2)', fs1 && fs1.mcq_score === 2 && fs1.mcq_max === 2, fs1 && (fs1.mcq_score + '/' + fs1.mcq_max));
-  check('FIB + theory max (3+5=8) in theory_max; total 2; max 10',
-    fs1 && fs1.theory_max === 8 && fs1.total === 2 && fs1.max_total === 10, fs1 && (fs1.theory_max + '/' + fs1.total + '/' + fs1.max_total));
+  // v1.9.0: the FIB answer 'Islamabad' matches the suggested answer, so it is
+  // auto-graded 3/3 at submit — total is 5 (MCQ 2 + auto FIB 3), not 2.
+  check('FIB auto-graded 3/3 at submit (total 5 = MCQ 2 + auto FIB 3); theory_max 8; max 10',
+    fs1 && fs1.theory_max === 8 && fs1.total === 5 && fs1.max_total === 10, fs1 && (fs1.theory_max + '/' + fs1.total + '/' + fs1.max_total));
+  const fsFull = await req('GET', '/api/submissions/' + fs1.id, null, admin.token);
+  const fsF = fsFull.json && fsFull.json.submission;
+  check('auto FIB recorded: theory_marks[1] = 3 and auto_marks[1] = 3',
+    fsF && fsF.theory_marks && fsF.theory_marks['1'] === 3 && fsF.auto_marks && fsF.auto_marks['1'] === 3,
+    JSON.stringify(fsF && { tm: fsF.theory_marks, am: fsF.auto_marks }));
   const fibSendEarly = await req('POST', '/api/submissions/' + fs1.id + '/send', {}, tokens.ashok.token);
   check('send before FIB/theory grading -> 400 (unmarked)', fibSendEarly.status === 400);
   const gradeFib = await req('POST', '/api/submissions/' + fs1.id + '/grade', { theory_marks: { 0: 5, 1: 3 } }, tokens.ashok.token);
   const gf = gradeFib.json && gradeFib.json.submission;
-  check('grade FIB 3/3; MCQ-index mark ignored (total 5, not 10)',
-    gf && gf.total === 5, gf && gf.total);
+  // v1.9.0: the teacher's re-mark of the auto-graded FIB is ignored (like the
+  // MCQ-index mark) — the auto mark 3/3 stands and the total stays 5.
+  check('teacher re-mark of auto FIB + MCQ-index mark ignored (total stays 5)',
+    gf && gf.total === 5 && gf.theory_marks && gf.theory_marks['1'] === 3, gf && gf.total);
   const fibSendEarly2 = await req('POST', '/api/submissions/' + fs1.id + '/send', {}, tokens.ashok.token);
   check('send with theory still unmarked -> 400', fibSendEarly2.status === 400);
   const gradeTheory = await req('POST', '/api/submissions/' + fs1.id + '/grade', { theory_marks: { 2: 4 } }, tokens.ashok.token);
@@ -826,6 +837,147 @@ async function main() {
     labSrc.includes('Your test has been locked because you left the exam page'));
   check('lab payload carries tab_switches + auto_locked (v1.8.0)',
     labSrc.includes('tab_switches: S.tabSwitches') && labSrc.includes('auto_locked: S.examLocked'));
+
+  console.log('\n[25] v1.9.0 — auto-grading: FIB auto-check + theory keywords, straight to Admin');
+  // Mixed test: MCQ + FIB with key + FIB without key + theory with key words
+  // + theory without key words. Fully-auto test: every question auto-gradable.
+  const autoA = await req('POST', '/api/tests', {
+    title: 'DIT Auto-Grade Test', course: 'DIT', type: 'daily-quiz',
+    duration_minutes: 30, randomize: 0,
+    questions: [
+      { type: 'mcq', question: 'Auto MCQ?', options: ['a', 'b', 'c', 'd'], correct: 1, marks: 2 },
+      { type: 'fib', question: 'The capital of France is ___.', suggested_answer: 'Paris', max_marks: 3 },
+      { type: 'fib', question: 'Water is ___.', max_marks: 2 },
+      { type: 'theory', question: 'Explain photosynthesis.', max_marks: 8,
+        model_answer: 'MODEL-ANSWER-PHOTOSYNTHESIS-SECRET',
+        key_words: 'sunlight, chlorophyll, KEYWORD-PHOTO-SECRET, oxygen' },
+      { type: 'theory', question: 'What is a computer?', max_marks: 5,
+        model_answer: 'MODEL-ANSWER-COMPUTER-SECRET' },
+    ],
+  }, admin.token);
+  const autoB = await req('POST', '/api/tests', {
+    title: 'CIT Auto-Grade Test', course: 'CIT', type: 'daily-quiz',
+    duration_minutes: 30, randomize: 0,
+    questions: [
+      { type: 'mcq', question: 'Auto MCQ 2?', options: ['a', 'b', 'c', 'd'], correct: 0, marks: 2 },
+      { type: 'fib', question: 'The capital of Pakistan is ___.', suggested_answer: 'Islamabad', max_marks: 3 },
+      { type: 'theory', question: 'Explain the water cycle.', max_marks: 6,
+        model_answer: 'MODEL-ANSWER-WATER-SECRET',
+        key_words: 'evaporation, condensation, precipitation' },
+    ],
+  }, admin.token);
+  check('setup: mixed + fully-auto tests created (both 201)',
+    autoA.status === 201 && autoB.status === 201, 'A ' + autoA.status + ', B ' + autoB.status);
+  const autoAId = autoA.json && autoA.json.test && autoA.json.test.id;
+  const autoBId = autoB.json && autoB.json.test && autoB.json.test.id;
+  // Mixed submission (E2E-001, kelash): MCQ right; FIB 'paris' (lowercase);
+  // theory with 2 of 4 key words (sunlight + chlorophyll).
+  const mixSub = await req('POST', '/api/submissions', {
+    client_id: 'e2e-ag1-' + Date.now(),
+    student: { roll_number: 'E2E-001' }, test_id: autoAId,
+    answers: [
+      { q: 0, answer: 1 },
+      { q: 1, answer: 'paris' },
+      { q: 2, answer: 'wet' },
+      { q: 3, answer: 'Plants use sunlight and chlorophyll to make food.' },
+      { q: 4, answer: 'A computer is a machine.' },
+    ],
+  });
+  const mix1 = mixSub.json && mixSub.json.submission;
+  const mixFull = mix1 ? await req('GET', '/api/submissions/' + mix1.id, null, admin.token) : null;
+  const mixF = mixFull && mixFull.json && mixFull.json.submission;
+  check('mixed submit routes to teacher (FIB2 + theory2 not auto-gradable)',
+    mix1 && mix1.status === 'submitted', JSON.stringify(mix1 && mix1.status));
+  check('FIB auto correct + case-tolerant: auto_marks[1] = 3',
+    mixF && mixF.auto_marks && mixF.auto_marks['1'] === 3, JSON.stringify(mixF && mixF.auto_marks));
+  check('theory keyword partial: 2/4 keywords -> auto_marks[3] = 4 (max 8)',
+    mixF && mixF.auto_marks && mixF.auto_marks['3'] === 4, JSON.stringify(mixF && mixF.auto_marks));
+  check('total at submit = 9 (MCQ 2 + auto FIB 3 + auto theory 4)',
+    mix1 && mix1.total === 9, mix1 && mix1.total);
+  const gradeMix = await req('POST', '/api/submissions/' + mix1.id + '/grade',
+    { theory_marks: { 2: 2, 4: 5 } }, tokens.kelash.token);
+  const gm = gradeMix.json && gradeMix.json.submission;
+  check('teacher grades only non-auto {2:2, 4:5} -> total 16/20, status graded',
+    gm && gm.total === 16 && gm.status === 'graded', gm && (gm.total + '/' + gm.max_total + ' ' + gm.status));
+  const overWrite = await req('POST', '/api/submissions/' + mix1.id + '/grade',
+    { theory_marks: { 1: 0, 3: 0 } }, tokens.kelash.token);
+  const ow = overWrite.json && overWrite.json.submission;
+  check('teacher cannot overwrite auto marks (re-mark 0 ignored, total stays 16)',
+    ow && ow.total === 16 && ow.theory_marks && ow.theory_marks['1'] === 3 && ow.theory_marks['3'] === 4,
+    JSON.stringify(ow && { t: ow.total, tm: ow.theory_marks }));
+  const sendMix = await req('POST', '/api/submissions/' + mix1.id + '/send', {}, tokens.kelash.token);
+  check('mixed result sent to Admin -> sent_to_admin (teacher flow intact)',
+    sendMix.json && sendMix.json.submission && sendMix.json.submission.status === 'sent_to_admin');
+  const finMix = await req('POST', '/api/submissions/' + mix1.id + '/finalize', {}, admin.token);
+  check('mixed result finalized by Admin -> final',
+    finMix.json && finMix.json.submission && finMix.json.submission.status === 'final');
+  // Fully-auto submission (E2E-002, ashok): every question auto-gradable.
+  const fullSub = await req('POST', '/api/submissions', {
+    client_id: 'e2e-ag2-' + Date.now(),
+    student: { roll_number: 'E2E-002' }, test_id: autoBId,
+    answers: [
+      { q: 0, answer: 0 },
+      { q: 1, answer: '  ISLAMABAD  ' },
+      { q: 2, answer: 'Evaporation lifts water up, condensation forms clouds, precipitation falls as rain.' },
+    ],
+  });
+  const full1 = fullSub.json && fullSub.json.submission;
+  const fullFull = full1 ? await req('GET', '/api/submissions/' + full1.id, null, admin.token) : null;
+  const fullF = fullFull && fullFull.json && fullFull.json.submission;
+  check('fully-auto submit goes straight to Admin (sent_to_admin, no teacher step)',
+    full1 && full1.status === 'sent_to_admin', JSON.stringify(full1 && full1.status));
+  check('FIB whitespace + case tolerant: auto_marks[1] = 3',
+    fullF && fullF.auto_marks && fullF.auto_marks['1'] === 3, JSON.stringify(fullF && fullF.auto_marks));
+  check('theory keyword full: 3/3 -> auto_marks[2] = 6',
+    fullF && fullF.auto_marks && fullF.auto_marks['2'] === 6, JSON.stringify(fullF && fullF.auto_marks));
+  check('fully-auto total 11/11 + graded_at set',
+    full1 && full1.total === 11 && full1.max_total === 11 && !!(fullF && fullF.graded_at),
+    JSON.stringify(full1 && { t: full1.total, m: full1.max_total, g: fullF && fullF.graded_at }));
+  const finFull = await req('POST', '/api/submissions/' + full1.id + '/finalize', {}, admin.token);
+  check('admin finalizes fully-auto result directly -> final',
+    finFull.json && finFull.json.submission && finFull.json.submission.status === 'final');
+  // Wrong answers (E2E-003, qurban): FIB wrong -> 0, theory no keywords -> 0.
+  const wrongSub = await req('POST', '/api/submissions', {
+    client_id: 'e2e-ag3-' + Date.now(),
+    student: { roll_number: 'E2E-003' }, test_id: autoAId,
+    answers: [
+      { q: 0, answer: 0 },
+      { q: 1, answer: 'London' },
+      { q: 2, answer: 'wet' },
+      { q: 3, answer: 'Plants are green.' },
+      { q: 4, answer: 'A machine.' },
+    ],
+  });
+  const wrong1 = wrongSub.json && wrongSub.json.submission;
+  const wrongFull = wrong1 ? await req('GET', '/api/submissions/' + wrong1.id, null, admin.token) : null;
+  const wrongF = wrongFull && wrongFull.json && wrongFull.json.submission;
+  check('FIB auto wrong -> 0',
+    wrongF && wrongF.auto_marks && wrongF.auto_marks['1'] === 0, JSON.stringify(wrongF && wrongF.auto_marks));
+  check('theory keyword none -> 0',
+    wrongF && wrongF.auto_marks && wrongF.auto_marks['3'] === 0, JSON.stringify(wrongF && wrongF.auto_marks));
+  check('wrong-answer mixed submission still routes to teacher (submitted, total 0)',
+    wrong1 && wrong1.status === 'submitted' && wrong1.total === 0, JSON.stringify(wrong1 && { s: wrong1.status, t: wrong1.total }));
+  // Answer keys never leak to students or into the lab pack.
+  const anonA = await req('GET', '/api/tests/' + autoAId);
+  check('anonymous fetch strips key_words + suggested_answer + model_answer values',
+    anonA.text.indexOf('key_words') === -1 && anonA.text.indexOf('KEYWORD-PHOTO-SECRET') === -1 &&
+    anonA.text.indexOf('Paris') === -1 && anonA.text.indexOf('MODEL-ANSWER-PHOTOSYNTHESIS-SECRET') === -1);
+  const staffA = await req('GET', '/api/tests/' + autoAId, null, tokens.kelash.token);
+  check('teacher fetch includes key_words (grading aid)',
+    staffA.text.indexOf('key_words') !== -1 && staffA.text.indexOf('KEYWORD-PHOTO-SECRET') !== -1);
+  const packA = await req('GET', '/api/lab-pack', null, admin.token);
+  check('lab-pack has NO key_words key, NO keyword values, NO model answers',
+    packA.text.indexOf('"key_words"') === -1 && packA.text.indexOf('KEYWORD-PHOTO-SECRET') === -1 &&
+    packA.text.indexOf('evaporation') === -1 && packA.text.indexOf('MODEL-ANSWER-PHOTOSYNTHESIS-SECRET') === -1 &&
+    packA.text.indexOf('Paris') === -1 && packA.text.includes('DIT Auto-Grade Test'));
+  // Code-level: builder + teacher + admin UI wiring.
+  check('builder has theory key_words field + FIB label no longer says not auto-graded',
+    admJs13.includes('data-field="key_words"') && admJs13.includes("key_words: ''") &&
+    !admJs13.includes('not auto-graded'));
+  check('teacher grading renders auto marks read-only with Auto tag',
+    teaJs13.includes('sub.auto_marks') && teaJs13.includes('badge-auto') && teaJs13.includes('auto-mark'));
+  check('admin results show Auto tag (badge-auto in admin.js + style.css)',
+    admJs13.includes('badge-auto') && admJs13.includes('auto_marks') && css.text.includes('.badge-auto'));
 
   console.log('\n========================================');
   console.log('E2E RESULT: ' + pass + ' PASS, ' + fail + ' FAIL');

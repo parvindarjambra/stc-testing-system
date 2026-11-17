@@ -71,7 +71,11 @@ async function openGrading(subId) {
     }
     const answersByQ = {};
     (sub.answers || []).forEach((a) => { answersByQ[a.q] = a.answer; });
-    // Theory AND fill-in-the-blank are both teacher-graded (MCQs are auto-graded).
+    // Theory AND fill-in-the-blank are teacher-graded — EXCEPT the ones the
+    // server auto-graded (v1.9.0: FIB with a key, theory with key words).
+    // Auto marks show read-only with an 'Auto' tag; the teacher grades only
+    // the remaining questions. (The server also ignores any mark sent for
+    // an auto-graded question, so the auto mark can never be overwritten.)
     const theoryQs = test.questions.map((q, i) => ({ q: q, i: i }))
       .filter((x) => x.q.type === 'theory' || x.q.type === 'fib');
     const body = $('grade-body');
@@ -83,18 +87,24 @@ async function openGrading(subId) {
         const saved = (sub.theory_marks && sub.theory_marks[x.i] != null) ? sub.theory_marks[x.i] : '';
         const stuAns = answersByQ[x.i];
         const isFib = x.q.type === 'fib';
+        const isAuto = !!(sub.auto_marks && sub.auto_marks[x.i] !== undefined && sub.auto_marks[x.i] !== null);
         const refLabel = isFib ? 'Suggested Answer' : 'Model Answer';
         const refText = isFib ? x.q.suggested_answer : x.q.model_answer;
         const typeLabel = isFib ? 'Fill in the Blank' : 'Theory';
+        const marksCell = isAuto
+          ? '<div class="auto-mark">Marks: <strong>' + sub.auto_marks[x.i] + ' / ' + x.q.max_marks + '</strong> ' +
+            '<span class="badge badge-auto">Auto</span></div>' +
+            (!isFib && x.q.key_words ? '<p class="muted">Key words: ' + esc(x.q.key_words) + '</p>' : '')
+          : '<label style="margin-top:10px">Marks (0–' + x.q.max_marks + ') ' +
+            '<input class="marks-input" type="number" min="0" max="' + x.q.max_marks + '" data-marks-for="' + x.i +
+            '" value="' + saved + '"' + (sub.locked ? ' disabled' : '') + '></label>';
         return '<div class="grade-q"><div class="q-head">Q' + (x.i + 1) + ' — ' + typeLabel + '. ' + esc(x.q.question) +
           ' <span class="q-marks">Max ' + x.q.max_marks + ' marks</span></div>' +
           '<div class="grade-cols"><div class="grade-col"><h5>Student Answer</h5>' +
           '<div class="answer-box">' + esc(stuAns == null || stuAns === '' ? '(no answer given)' : stuAns) + '</div></div>' +
           '<div class="grade-col"><h5>' + refLabel + '</h5>' +
           '<div class="answer-box">' + esc(refText || '(no ' + refLabel.toLowerCase() + ')') + '</div>' +
-          '<label style="margin-top:10px">Marks (0–' + x.q.max_marks + ') ' +
-          '<input class="marks-input" type="number" min="0" max="' + x.q.max_marks + '" data-marks-for="' + x.i +
-          '" value="' + saved + '"' + (sub.locked ? ' disabled' : '') + '></label></div></div></div>';
+          marksCell + '</div></div></div>';
       }).join('');
       body.querySelectorAll('[data-marks-for]').forEach((inp) => {
         inp.addEventListener('input', updateGradeTotal);
@@ -123,6 +133,9 @@ function updateGradeTotal() {
   const sub = S.grading.submission;
   const marks = collectTheoryMarks();
   let theory = 0;
+  // v1.9.0: auto-graded questions have no input, so their marks are not in
+  // collectTheoryMarks — add them from the submission's auto_marks.
+  Object.keys(sub.auto_marks || {}).forEach((k) => { theory += +(sub.auto_marks[k] || 0); });
   Object.keys(marks).forEach((k) => { theory += marks[k]; });
   $('grade-total-text').textContent = (sub.mcq_score + theory) + ' / ' + sub.max_total +
     '  (MCQ ' + sub.mcq_score + ' + Theory / FIB ' + theory + ' of ' + sub.theory_max + ')';

@@ -1,6 +1,6 @@
 # STC Testing System — Examination, Quiz & Result Management System
 
-**Version 1.8.0** — **Anti-cheat**: during an exam, leaving the page (another tab or app) shows an automatic warning the first time and auto-locks + auto-submits the test the second time; the teacher sees a red warning banner on that student's result (the violation is stored on the submission as tab_switches / auto_locked). **Full-width consoles + inline errors + no student back/change (v1.7.0)**: the Admin/Teacher/Principal consoles now fill the whole screen width like Study Vault (layout only, no new features); test-builder and console-form validation errors show inline at the offending question/field and scroll into view instead of only in the top alert; and the student can no longer go back to change details after verification (forward-only: Confirm → test → submit → next student). **No credentials shown in the UI** (v1.6.1): the staff login pages no longer display any demo usernames or passwords — this is a real institute system, not a demo. **Four-field student verification** (v1.6.0): the student enters Name, Father's Name, Course and Roll Number (not roll number only); the system checks them in that order against Admin's list and names the first wrong field in English, and the teacher's name auto-fills from Admin's data. **Home page is the Student Terminal** (v1.5.1): `/` now shows ONLY the student roll-number terminal (same page as `/student`) — students never see the staff portals; staff log in from the single discreet **Staff / Faculty Login** menu at the top-right. **Modern redesign** (v1.5.0): deep-navy sidebar console with brand block + icon tabs, pill badges for teachers/courses/shifts, refreshed landing hero and dark login screens — same flows, no feature changes. The first wrong field is named in English ('Your Name is wrong.', 'Your Father's Name is wrong.', 'Your Course is wrong.', 'Your Roll Number is wrong.'), and the teacher button is 'Submit to Admin'. **Forgiving student CSV import** (v1.4.2, see §6): "Sir Ashok Kumar" now matches, unpadded "9:00 AM" shifts and lowercase courses ("cit" → "CIT") are accepted. **No fixed consolidation time** (v1.4.1): the 7:30 PM auto-consolidation is removed; Admin runs **Day Consolidation** any time — same evening or next morning — picking the date. **USB sync for offline labs** (v1.4.0): labs with no network at all get a standalone lab app (`STC-Lab.html`) — students test fully offline, and submissions come back on a USB stick for Admin to import (see §1c). Everything from v1.3.2 stays: the code lives on GitHub (https://github.com/parvindarjambra/stc-testing-system) with one-click updates (double-click `UPDATE.bat` on the Admin PC, no more ZIP downloads); laptops on the LAN need nothing installed — they just open the exam page in the browser (see §1b). Renamed to **STC Testing System**; the real STC logo in every header (local file, offline); a "Back to Home" button on every staff portal page (the Student Terminal IS home); teacher CSV import; fill-in-the-blank questions (teacher-graded, like theory); Admin course-wise results export to Excel (CSV) + printable course-wise result sheets. See TEST_REPORT.md for the full v1.8.0 note.
+**Version 1.9.0** — **Auto-grading**: fill-in-the-blank answers are auto-checked against the Admin's correct answer, and theory answers are auto-graded by key words (Admin writes the key words when creating the test; marks = how many appear in the student's answer). A submission that is FULLY auto-graded goes straight to Admin — the teacher is skipped. Anything not auto-gradable (blank without a correct answer, theory without key words) still goes to its teacher, who grades ONLY those questions with the auto marks shown read-only. **Honest limit:** there is no AI offline — real concept understanding is impossible; keyword matching is the method and it is rough, so Admin can judge quality from the small 'Auto' tag on auto-graded marks, and the teacher flow stays fully intact as the fallback. **Anti-cheat (v1.8.0)**: during an exam, leaving the page (another tab or app) shows an automatic warning the first time and auto-locks + auto-submits the test the second time; the teacher sees a red warning banner on that student's result (the violation is stored on the submission as tab_switches / auto_locked). **Full-width consoles + inline errors + no student back/change (v1.7.0)**: the Admin/Teacher/Principal consoles now fill the whole screen width like Study Vault (layout only, no new features); test-builder and console-form validation errors show inline at the offending question/field and scroll into view instead of only in the top alert; and the student can no longer go back to change details after verification (forward-only: Confirm → test → submit → next student). **No credentials shown in the UI** (v1.6.1): the staff login pages no longer display any demo usernames or passwords — this is a real institute system, not a demo. **Four-field student verification** (v1.6.0): the student enters Name, Father's Name, Course and Roll Number (not roll number only); the system checks them in that order against Admin's list and names the first wrong field in English, and the teacher's name auto-fills from Admin's data. **Home page is the Student Terminal** (v1.5.1): `/` now shows ONLY the student roll-number terminal (same page as `/student`) — students never see the staff portals; staff log in from the single discreet **Staff / Faculty Login** menu at the top-right. **Modern redesign** (v1.5.0): deep-navy sidebar console with brand block + icon tabs, pill badges for teachers/courses/shifts, refreshed landing hero and dark login screens — same flows, no feature changes. The first wrong field is named in English ('Your Name is wrong.', 'Your Father's Name is wrong.', 'Your Course is wrong.', 'Your Roll Number is wrong.'), and the teacher button is 'Submit to Admin'. **Forgiving student CSV import** (v1.4.2, see §6): "Sir Ashok Kumar" now matches, unpadded "9:00 AM" shifts and lowercase courses ("cit" → "CIT") are accepted. **No fixed consolidation time** (v1.4.1): the 7:30 PM auto-consolidation is removed; Admin runs **Day Consolidation** any time — same evening or next morning — picking the date. **USB sync for offline labs** (v1.4.0): labs with no network at all get a standalone lab app (`STC-Lab.html`) — students test fully offline, and submissions come back on a USB stick for Admin to import (see §1c). Everything from v1.3.2 stays: the code lives on GitHub (https://github.com/parvindarjambra/stc-testing-system) with one-click updates (double-click `UPDATE.bat` on the Admin PC, no more ZIP downloads); laptops on the LAN need nothing installed — they just open the exam page in the browser (see §1b). Renamed to **STC Testing System**; the real STC logo in every header (local file, offline); a "Back to Home" button on every staff portal page (the Student Terminal IS home); teacher CSV import; fill-in-the-blank questions (auto-checked when the Admin sets a correct answer, otherwise teacher-graded, like theory); Admin course-wise results export to Excel (CSV) + printable course-wise result sheets. See TEST_REPORT.md for the full v1.9.0 note.
 
 **Super Sys-Tech Computers Centre, Umerkot** (also known as Super City Computer Center)
 *"Empowering Skills Since 1997"*
@@ -130,18 +130,22 @@ moves only on a USB stick.
    teacher clicks **Export (Teacher)** and saves the JSON file
    (`STC-Lab-Submissions-<date>.json`) to the USB stick. One file per laptop.
 4. **Admin imports.** Admin portal → USB Lab Sync → Import Lab Submissions:
-   select all the USB files at once and import. MCQs are auto-graded on
-   import. Importing the same file twice is safe — already-imported
+   select all the USB files at once and import. MCQs, fill-in-the-blank
+   answers with a correct answer, and theory answers with key words are all
+   auto-graded on import — identical marks to an online submission with the
+   same answers. Importing the same file twice is safe — already-imported
    submissions are counted as duplicates and skipped.
 5. **Teachers grade on the Admin PC** (Teacher portal, their own students
-   only): fill-in-the-blank + theory answers, then **Send to Admin** — the
-   same as online submissions. Admin finalizes as usual; the monthly report
-   includes imported results.
+   only): the fill-in-the-blank + theory answers that were NOT auto-graded,
+   then **Send to Admin** — the same as online submissions. A fully
+   auto-graded lab submission goes straight to Admin. Admin finalizes as
+   usual; the monthly report includes imported results.
 
 **Rules that keep it safe**
 
 - The lab pack contains **no answer keys** — a student cannot find answers
-  via view-source. MCQ marks are counted on the Admin PC at import time.
+  via view-source. MCQ, fill-in-the-blank and theory-key-word marks are all
+  counted on the Admin PC at import time.
 - A test taken on Monday counts on Monday even if the USB import happens
   later (the submission keeps its own test date).
 - Only clear a laptop's saved submissions (**Clear saved** button) AFTER
@@ -248,8 +252,11 @@ Name + Father's Name + Course + Roll Number checked against Admin's list
 (first wrong field named, in English) → registered details shown read-only
 (teacher auto-filled) → confirm → test picker → exam screen with live
 countdown timer, question palette, auto-submit on timeout. MCQs are
-auto-graded from the Admin's answer key; theory and fill-in-the-blank
-answers go to the teacher for marking. After submitting, the screen shows
+auto-graded from the Admin's answer key; fill-in-the-blank answers are
+auto-checked when the Admin set a correct answer, and theory answers are
+auto-graded by key words when the Admin set them — anything without a key
+goes to the teacher for marking. A fully auto-graded submission goes
+straight to Admin. After submitting, the screen shows
 the MCQ score, then clears the session immediately for the next student.
 A student whose details do not match the list cannot enter any test
 (see §2, §6).
@@ -257,8 +264,10 @@ A student whose details do not match the list cannot enter any test
 **Teacher Portal — `/teacher` (login)**
 Each teacher sees **only** their own assigned students (enforced by the
 server). Side-by-side grading (student answer vs. model answer / suggested
-answer + max marks) for theory and fill-in-the-blank questions, per-question
-marks, auto-computed total, then **Submit to Admin**
+answer + max marks) for the theory and fill-in-the-blank questions that
+were NOT auto-graded; auto-graded questions show their mark read-only with
+a small 'Auto' tag (the teacher cannot change them). Per-question marks,
+auto-computed total, then **Submit to Admin**
 (single or bulk for the day). Teachers can also view their own
 Day Consolidation sheet.
 
@@ -266,8 +275,10 @@ Day Consolidation sheet.
 Sidebar: Dashboard, Students, Tests, Results, Monthly Reports, Day
 Consolidation, Courses, Teachers. Live shift monitor, Students (add/edit +
 Excel/CSV bulk import), Test & Quiz Builder (MCQs + Fill in the Blank +
-Theory, timer, randomize order, **month** for monthly tests), review
-teacher-submitted results, Finalize, Monthly Report, course-wise results
+Theory, timer, randomize order, **month** for monthly tests; FIB correct
+answer + theory key words for auto-grading), review
+teacher-submitted results (auto-graded marks carry a small 'Auto' tag),
+Finalize, Monthly Report, course-wise results
 export to Excel (CSV) + printable course-wise result sheets, and the Day
 Consolidation button + history. Teachers can also be bulk-imported from CSV
 (Admin → Teachers → Import CSV).

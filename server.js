@@ -19,6 +19,10 @@
 // v1.7.0: full-width staff consoles + inline validation errors + no student back/change.
 // v1.8.0: anti-cheat — tab-switch warning then auto-lock; the violation is
 // recorded on the submission (tab_switches / auto_locked) for the teacher.
+// v1.9.0: auto-grading — FIB auto-checked against the suggested answer and
+// theory auto-graded by key words (keyword matching only: no AI offline, so
+// real concept understanding is impossible). Fully auto-graded submissions
+// go straight to Admin; anything else goes to the teacher as before.
 
 'use strict';
 
@@ -29,7 +33,7 @@ const crypto = require('crypto');
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = '0.0.0.0';
-const VERSION = '1.8.0';
+const VERSION = '1.9.0';
 const ROOT = __dirname;
 const DATA_DIR = path.join(ROOT, 'data');
 const PUBLIC_DIR = path.join(ROOT, 'public');
@@ -358,7 +362,9 @@ function createApp(store) {
   }
   function stripAnswers(test) {
     // Student-facing view: questions WITHOUT correct answers / model answers /
-    // suggested answers. FIB keeps only its text + marks (the blank itself).
+    // suggested answers / theory key words (v1.9.0). Only whitelisted fields
+    // are copied, so no key can ever leak — including into the lab pack.
+    // FIB keeps only its text + marks (the blank itself).
     const copy = Object.assign({}, test);
     copy.questions = (test.questions || []).map((q) => {
       if (q.type === 'mcq') return { type: 'mcq', question: q.question, options: q.options, marks: q.marks };
@@ -386,9 +392,13 @@ function createApp(store) {
       } else if (q.type === 'theory') {
         if (typeof q.question !== 'string' || !q.question.trim()) return 'question ' + i + ': text required';
         if (!Number.isFinite(+q.max_marks) || +q.max_marks <= 0) return 'question ' + i + ': max_marks must be positive';
+        // v1.9.0: key_words (comma-separated) makes the question auto-gradable.
+        // No key words -> the question stays teacher-graded, as before.
+        if (q.key_words !== undefined && typeof q.key_words !== 'string') return 'question ' + i + ': key_words must be text';
       } else if (q.type === 'fib') {
-        // Fill-in-the-blank: teacher-graded like theory. suggested_answer is
-        // shown to the teacher while grading; it is NEVER auto-graded.
+        // Fill-in-the-blank (v1.9.0): suggested_answer IS the auto-check key —
+        // a matching student answer scores full marks automatically. A FIB
+        // WITHOUT a suggested answer stays teacher-graded, as before.
         if (typeof q.question !== 'string' || !q.question.trim()) return 'question ' + i + ': text required';
         if (!Number.isFinite(+q.max_marks) || +q.max_marks <= 0) return 'question ' + i + ': max_marks must be positive';
         if (q.suggested_answer !== undefined && typeof q.suggested_answer !== 'string') return 'question ' + i + ': suggested_answer must be text';
@@ -398,25 +408,89 @@ function createApp(store) {
   }
 
   // --- grading --------------------------------------------------------------
-  // Auto-grade MCQs from the STORED test — never trust client-supplied scores.
+  // Auto-grade from the STORED test — never trust client-supplied scores.
+  // v1.9.0: FIB + theory are auto-graded too when Admin supplied a key:
+  //   - FIB with a suggested answer: exact match (forgiving: case-insensitive,
+  //     trimmed, internal whitespace collapsed) -> full max_marks, else 0.
+  //   - Theory with key words: marks = round(max_marks x matched / total).
+  //     HONEST LIMIT: there is no AI offline, so real concept understanding
+  //     is impossible — keyword matching is the method and it is rough.
+  //   - FIB without a suggested answer / theory without key words: NOT
+  //     auto-graded — they stay teacher-graded (fully_auto = false).
+  // Auto marks are returned in auto_marks {questionIndex: mark} and are
+  // pre-filled into theory_marks at insert, so totals, reports and
+  // consolidation work unchanged. fully_auto is true only when EVERY
+  // non-MCQ question was auto-graded (an MCQ-only test is fully auto
+  // by definition).
+  function normAnswerText(s) {
+    return String(s == null ? '' : s).toLowerCase().replace(/\s+/g, ' ').trim();
+  }
+  function parseKeyWords(raw) {
+    if (typeof raw !== 'string') return [];
+    return raw.split(',').map((k) => normAnswerText(k)).filter(Boolean);
+  }
+  function normForMatch(s) {
+    // Padded, lowercased, punctuation -> spaces: matching ' word ' inside
+    // ' ... answer ... ' then matches whole words/phrases only, never a
+    // substring inside another word ('photo' never matches 'photosynthesis').
+    return ' ' + String(s == null ? '' : s).toLowerCase()
+      .replace(/[^\p{L}\p{N}]+/gu, ' ').replace(/\s+/g, ' ').trim() + ' ';
+  }
+  function keywordMatched(answer, kw) {
+    const k = String(kw || '').toLowerCase()
+      .replace(/[^\p{L}\p{N}]+/gu, ' ').replace(/\s+/g, ' ').trim();
+    if (!k) return false;
+    return normForMatch(answer).includes(' ' + k + ' ');
+  }
   function gradeSubmission(test, answers) {
     const byQ = {};
     for (const a of (answers || [])) {
       if (a && Number.isInteger(a.q)) byQ[a.q] = a.answer;
     }
     let mcq_score = 0, mcq_max = 0, theory_max = 0;
+    const auto_marks = {};
+    let fully_auto = true;
     (test.questions || []).forEach((q, i) => {
       if (q.type === 'mcq') {
         mcq_max += +q.marks || 0;
         if (byQ[i] !== undefined && +byQ[i] === q.correct) mcq_score += +q.marks || 0;
-      } else if (q.type === 'theory' || q.type === 'fib') {
-        // Theory + fill-in-the-blank are both teacher-graded: their max marks
-        // count in theory_max (the manual-marks bucket). FIB is never
-        // auto-graded — the suggested answer is only a grading aid.
+      } else if (q.type === 'fib') {
         theory_max += +q.max_marks || 0;
+        const key = normAnswerText(q.suggested_answer);
+        if (key) {
+          auto_marks[i] = normAnswerText(byQ[i]) === key ? (+q.max_marks || 0) : 0;
+        } else {
+          fully_auto = false;
+        }
+      } else if (q.type === 'theory') {
+        theory_max += +q.max_marks || 0;
+        const kws = parseKeyWords(q.key_words);
+        if (kws.length) {
+          let matched = 0;
+          for (const kw of kws) if (keywordMatched(byQ[i], kw)) matched++;
+          auto_marks[i] = Math.round((+q.max_marks || 0) * matched / kws.length);
+        } else {
+          fully_auto = false;
+        }
       }
     });
-    return { mcq_score, mcq_max, theory_max, max_total: mcq_max + theory_max };
+    const auto_total = Object.values(auto_marks).reduce((s, v) => s + (+v || 0), 0);
+    return { mcq_score, mcq_max, theory_max, max_total: mcq_max + theory_max, auto_marks, auto_total, fully_auto };
+  }
+
+  // Shared by the online submit endpoint and the lab-import endpoint: turns
+  // a gradeSubmission() result into the submission fields that depend on
+  // auto-grading, so identical answers get identical marks in both paths.
+  // A FULLY auto-graded submission goes STRAIGHT to Admin (sent_to_admin) —
+  // the teacher is skipped. Anything else stays 'submitted' for the teacher.
+  function autoGradeFields(g) {
+    return {
+      theory_marks: Object.assign({}, g.auto_marks),
+      auto_marks: g.auto_marks,
+      total: g.mcq_score + g.auto_total,
+      status: g.fully_auto ? 'sent_to_admin' : 'submitted',
+      graded_at: g.fully_auto ? nowIso() : null,
+    };
   }
   function theoryMarksTotal(sub) {
     return Object.values(sub.theory_marks || {}).reduce((s, v) => s + (+v || 0), 0);
@@ -737,17 +811,17 @@ function createApp(store) {
       if (!registered) return sendJson(res, 404, { ok: false, error: 'roll_not_registered' });
       if (!Array.isArray(b.answers)) return sendJson(res, 400, { ok: false, error: 'answers must be an array' });
       const g = gradeSubmission(test, b.answers);
-      const sub = store.insert('submissions', {
+      const sub = store.insert('submissions', Object.assign({
         id: newId(), client_id: b.client_id, student_roll: registered.roll_number,
         student_name: registered.name, father_name: registered.father_name || '',
         course: registered.course, shift: registered.shift,
         teacher_id: registered.teacher_id || null, test_id: test.id, test_title: test.title,
         date: todayStr(), answers: b.answers,
-        mcq_score: g.mcq_score, mcq_max: g.mcq_max, theory_marks: {}, theory_max: g.theory_max,
-        total: g.mcq_score, max_total: g.max_total, status: 'submitted',
-        submitted_at: nowIso(), graded_at: null, locked: 0,
+        mcq_score: g.mcq_score, mcq_max: g.mcq_max, theory_max: g.theory_max,
+        max_total: g.max_total,
+        submitted_at: nowIso(), locked: 0,
         tab_switches: sanitizeTabSwitches(b.tab_switches), auto_locked: b.auto_locked === true,
-      });
+      }, autoGradeFields(g)));
       return sendJson(res, 201, { ok: true, submission: submissionSummary(sub) });
     }
     if (method === 'GET' && pathname === '/api/submissions') {
@@ -799,13 +873,17 @@ function createApp(store) {
       }
       // Clamp each mark to [0, max_marks] of its theory/FIB question; ignore
       // MCQ indexes (MCQs are auto-graded from the Admin's key — a mark sent
-      // for an MCQ index can never change the score).
+      // for an MCQ index can never change the score). v1.9.0: also ignore
+      // marks for AUTO-graded questions (FIB with a key, theory with key
+      // words) — the teacher grades only the non-auto questions; the
+      // server-assigned auto mark is read-only and can never be overwritten.
       const test = store.findOne('tests', s.test_id);
       const marks = Object.assign({}, s.theory_marks || {});
       for (const [k, v] of Object.entries(b.theory_marks)) {
         const qi = parseInt(k, 10);
         const q = test && test.questions ? test.questions[qi] : null;
         if (!q || (q.type !== 'theory' && q.type !== 'fib')) continue;
+        if (s.auto_marks && s.auto_marks[qi] !== undefined) continue;
         marks[qi] = Math.max(0, Math.min(+q.max_marks, +v || 0));
       }
       const theoryTotal = Object.values(marks).reduce((sum, v) => sum + (+v || 0), 0);
@@ -844,10 +922,11 @@ function createApp(store) {
 
     // ---- USB lab sync (offline labs, no network) ----
     // Lab pack: every student + every test, with questions stripped of
-    // answer keys (stripAnswers removes MCQ `correct` and FIB
-    // suggested_answer). The pack is embedded into lab-template.html and
-    // downloaded as STC-Lab.html — a single file the lab laptops open
-    // with a double-click. Admin only: the pack holds the student list.
+    // answer keys (stripAnswers removes MCQ `correct`, FIB suggested_answer,
+    // theory model_answer and theory key_words). The pack is embedded into
+    // lab-template.html and downloaded as STC-Lab.html — a single file the
+    // lab laptops open with a double-click. Admin only: the pack holds the
+    // student list.
     if (method === 'GET' && pathname === '/api/lab-pack') {
       if (!requireAuth(req, res, ['admin'])) return;
       let template;
@@ -880,10 +959,14 @@ function createApp(store) {
     // Lab import: submissions JSON exported from a lab laptop (USB stick).
     // Accepts the lab app's envelope { submissions: [...] } or a bare array.
     // Each submission is validated like an online submit (test must exist,
-    // roll must be registered — the registered record is the truth), MCQs
-    // are auto-graded from the server's key, and records are inserted with
-    // the EXACT online submission schema (status 'submitted'), so teacher
-    // grading, send-to-admin, finalize and the monthly report work unchanged.
+    // roll must be registered — the registered record is the truth), and
+    // auto-graded by the SAME shared code path as online submits
+    // (gradeSubmission + autoGradeFields), so identical answers get
+    // identical marks. Records are inserted with the EXACT online
+    // submission schema — fully auto-graded ones go straight to Admin
+    // (sent_to_admin), the rest stay 'submitted' for the teacher — so
+    // teacher grading, send-to-admin, finalize and the monthly report
+    // work unchanged.
     // Dedupe by client_id: re-importing the same USB file is safe.
     if (method === 'POST' && pathname === '/api/lab-import') {
       if (!requireAuth(req, res, ['admin'])) return;
@@ -918,17 +1001,17 @@ function createApp(store) {
           submittedAt = new Date(item.submitted_at).toISOString();
         }
         const date = isValidDate(submittedAt.slice(0, 10)) ? submittedAt.slice(0, 10) : todayStr();
-        store.insert('submissions', {
+        store.insert('submissions', Object.assign({
           id: newId(), client_id: item.client_id, student_roll: registered.roll_number,
           student_name: registered.name, father_name: registered.father_name || '',
           course: registered.course, shift: registered.shift,
           teacher_id: registered.teacher_id || null, test_id: test.id, test_title: test.title,
           date, answers: item.answers,
-          mcq_score: g.mcq_score, mcq_max: g.mcq_max, theory_marks: {}, theory_max: g.theory_max,
-          total: g.mcq_score, max_total: g.max_total, status: 'submitted',
-          submitted_at: submittedAt, graded_at: null, locked: 0,
+          mcq_score: g.mcq_score, mcq_max: g.mcq_max, theory_max: g.theory_max,
+          max_total: g.max_total,
+          submitted_at: submittedAt, locked: 0,
           tab_switches: sanitizeTabSwitches(item.tab_switches), auto_locked: item.auto_locked === true,
-        });
+        }, autoGradeFields(g)));
         imported++;
       }
       return sendJson(res, 200, { ok: true, imported, duplicates, errors });

@@ -1,4 +1,6 @@
-// STC Testing System — USB-sync verification script (v1.8.0: offline labs).
+// STC Testing System — USB-sync verification script (v1.9.0: offline labs,
+// auto-grading via the shared server path — FIB auto-checked, theory without
+// key words still teacher-graded).
 // Tests the full offline-lab loop WITHOUT a browser:
 //   seed students + a monthly test via the Admin API -> export the lab pack
 //   (GET /api/lab-pack) -> build lab submissions EXACTLY in the format the
@@ -55,7 +57,7 @@ async function main() {
 
   console.log('\n[1] Health + admin login');
   const h = await req('GET', '/api/health');
-  check('health 200 + version 1.8.0', h.status === 200 && h.json && h.json.version === '1.8.0', h.json && h.json.version);
+  check('health 200 + version 1.9.0', h.status === 200 && h.json && h.json.version === '1.9.0', h.json && h.json.version);
   const admin = await login('admin', 'admin123', 'admin');
   check('admin login', !!(admin && admin.token));
   if (!admin) { console.log('FATAL: admin login failed'); process.exit(1); }
@@ -122,7 +124,7 @@ async function main() {
   //   submitted_at }, wrapped in the export envelope.
   const nowIso = new Date().toISOString();
   const envelope = {
-    format: 'stc-lab-submissions', version: '1.8.0', pack_id: packId,
+    format: 'stc-lab-submissions', version: '1.9.0', pack_id: packId,
     exported_at: nowIso,
     submissions: [
       {
@@ -172,9 +174,18 @@ async function main() {
       sub1.theory_max === 7 && sub2.theory_max === 7);
     check('max_total 12 on both', sub1.max_total === 12 && sub2.max_total === 12);
     check('total = mcq_score before grading', sub1.total === 2 && sub2.total === 5);
-    check('status submitted + empty theory_marks + not locked',
+    // v1.9.0: the FIB 'H2O' does not match the key 'H2O-SUGGESTED-ONLY', so
+    // it is auto-graded 0 at import (theory_marks {2: 0}, auto_marks {2: 0});
+    // the theory question has no key words, so it stays teacher-graded and
+    // the submission still routes to the teacher (status submitted).
+    check('status submitted + auto FIB 0 in theory_marks + not locked',
       sub1.status === 'submitted' && sub2.status === 'submitted' &&
-      Object.keys(sub1.theory_marks || {}).length === 0 && !sub1.locked);
+      sub1.theory_marks && sub1.theory_marks['2'] === 0 &&
+      sub1.auto_marks && sub1.auto_marks['2'] === 0 && !sub1.locked,
+      JSON.stringify(sub1 && { tm: sub1.theory_marks, am: sub1.auto_marks }));
+    check('theory without key words NOT auto-graded (no auto_marks[3])',
+      sub1.auto_marks && sub1.auto_marks['3'] === undefined &&
+      sub2.auto_marks && sub2.auto_marks['3'] === undefined);
     check('teacher routed from registered record (kelash / ashok)',
       sub1.teacher_id === kelash.id && sub2.teacher_id === ashok.id);
     check('date = today (lab test date kept)',
@@ -221,17 +232,19 @@ async function main() {
   const kList = (kelashSubs.json && kelashSubs.json.submissions) || [];
   check('kelash sees only his own student (LAB001)',
     kList.length === 1 && kList[0].student_roll === 'LAB001', 'got ' + kList.length);
+  // v1.9.0: the FIB is auto-graded (0 — wrong answer), so the teacher's
+  // mark for it is ignored; only the theory mark counts.
   const g1 = await req('POST', '/api/submissions/' + sub1.id + '/grade',
     { theory_marks: { 2: 2, 3: 4 } }, kelashLogin.token);
-  check('kelash grades LAB001 FIB 2 + theory 4',
+  check('kelash grades LAB001 theory 4 (FIB mark ignored — auto-graded 0)',
     g1.status === 200 && g1.json && g1.json.submission && g1.json.submission.status === 'graded',
     g1.status + ' ' + g1.text.slice(0, 160));
-  check('LAB001 total now 8/12 (mcq 2 + theory 6)',
-    g1.json && g1.json.submission && g1.json.submission.total === 8, JSON.stringify(g1.json && g1.json.submission));
+  check('LAB001 total now 6/12 (mcq 2 + auto FIB 0 + theory 4)',
+    g1.json && g1.json.submission && g1.json.submission.total === 6, JSON.stringify(g1.json && g1.json.submission));
   const g2 = await req('POST', '/api/submissions/' + sub2.id + '/grade',
     { theory_marks: { 2: 1, 3: 5 } }, ashokLogin.token);
-  check('ashok grades LAB002 FIB 1 + theory 5',
-    g2.status === 200 && g2.json && g2.json.submission && g2.json.submission.total === 11,
+  check('ashok grades LAB002 theory 5 (FIB mark ignored — auto-graded 0)',
+    g2.status === 200 && g2.json && g2.json.submission && g2.json.submission.total === 10,
     g2.status + ' ' + g2.text.slice(0, 160));
 
   console.log('\n[9] Send to Admin + finalize');
@@ -253,8 +266,8 @@ async function main() {
   check('monthly report has LAB001 (final)', !!row1, 'rows: ' + rows.map((r) => r.roll_number).join(','));
   check('monthly report has LAB002 (sent_to_admin)', !!row2);
   if (row1 && row2) {
-    check('LAB001 report total 8/12', row1.total === 8 && row1.max === 12, JSON.stringify(row1));
-    check('LAB002 report total 11/12', row2.total === 11 && row2.max === 12, JSON.stringify(row2));
+    check('LAB001 report total 6/12', row1.total === 6 && row1.max === 12, JSON.stringify(row1));
+    check('LAB002 report total 10/12', row2.total === 10 && row2.max === 12, JSON.stringify(row2));
   }
 
   console.log('\n========================================');

@@ -738,3 +738,85 @@ real lab-import of the exported file preserves them server-side).
 Screenshots: v180-warning-modal.png, v180-locked-screen.png,
 v180-teacher-banner.png in the project folder (not shipped in the ZIP).
 Version bumped to 1.8.0.
+
+## v1.9.0 (2026-11-16) — Auto-grading: FIB auto-check + theory keyword auto-grading, straight to Admin
+
+Ordered by the user (09:09 PST): fill-in-the-blank answers auto-checked
+like MCQs, and theory answers auto-graded — Admin writes the model answer
+and the key words, and the answer is accepted if it is relative / the
+same concept. The user's plan: keep BOTH systems — auto first; if the
+auto theory marks look wrong, he will say so and theory goes back to the
+teachers. If auto works, results go straight to Admin (teachers out of
+the loop); only Admin + the USB worker remain.
+
+How it works (server-side, ONE shared code path — `gradeSubmission` +
+`autoGradeFields` — used by BOTH the online submit endpoint and the
+lab-import endpoint, so identical answers get identical marks in both
+paths):
+
+- **FIB auto-check:** the 'Suggested answer' field in the builder is now
+  the auto-check key (label changed from 'not auto-graded' to 'Correct
+  answer (auto-checked — leave blank for teacher grading)'). Match is
+  forgiving: case-insensitive, trimmed, internal whitespace collapsed.
+  A matching answer scores full max_marks, anything else scores 0.
+  A FIB question WITHOUT a suggested answer cannot be auto-checked —
+  it stays teacher-graded, as before.
+- **Theory keyword auto-grading:** a NEW comma-separated 'Key words'
+  field per theory question (builder). At grading, the server counts
+  how many key words appear in the student's answer (case-insensitive,
+  whole words/phrases only — 'photo' never matches inside
+  'photosynthesis'; punctuation is ignored) and marks =
+  round(max_marks x matched / total). A theory question with NO key
+  words is NOT auto-graded — it goes to the teacher, as before.
+- **Routing:** when a submission is FULLY auto-graded (MCQ + FIB +
+  every theory question auto-graded — an MCQ-only test is fully auto
+  by definition), it goes STRAIGHT to Admin (status `sent_to_admin`,
+  `graded_at` set) — the teacher is skipped. If ANY question is not
+  auto-gradable, the submission goes to its teacher as before; the
+  teacher grades ONLY the non-auto questions, with the auto marks
+  shown read-only with a small 'Auto' tag (the grade endpoint also
+  ignores any mark sent for an auto-graded question, like MCQ indexes
+  — the server-assigned auto mark can never be overwritten). The
+  teacher flow, grading console and 'Submit to Admin' stay FULLY
+  INTACT as the fallback — no teacher code was deleted or disabled.
+- **Admin visibility:** auto-graded marks carry a small 'Auto' tag in
+  the Admin Results review (`.badge-auto`, indigo pill) so Admin can
+  judge the auto-grading quality at a glance. Subtle — one small tag,
+  no redesign.
+- **No keys in the lab pack:** `stripAnswers` is a field whitelist, so
+  FIB suggested answers, theory key words and model answers are all
+  stripped from the pack exactly like MCQ keys already were (verified
+  in the E2E suite and on the real exported pack file).
+
+Honest limit: there is no AI offline — real concept understanding is
+impossible. Keyword matching is the method and it is rough: it can
+misjudge both ways (a good answer in different words scores low; an
+answer that merely lists the key words scores high). That is why the
+teacher flow stays as the fallback and why auto marks are tagged.
+
+Tests: E2E 276 PASS, 0 FAIL (was 252; +24 — §20 FIB flow rewritten for
+auto-grading (FIB auto 3/3 at submit, teacher re-mark ignored) + 1 new
+check there, and new §25 with 23 checks: mixed routing to teacher, FIB
+auto correct/wrong/case- + whitespace-tolerant, theory keyword
+full/partial/none marks, teacher grades only non-auto, teacher cannot
+overwrite auto marks, fully-auto straight to Admin + direct finalize,
+anonymous fetch + lab-pack strip key words / suggested answers / model
+answers, builder/teacher/admin UI wiring); e2e-sync-test.js 54 PASS,
+0 FAIL (was 53; +1 — theory without key words NOT auto-graded at
+import; totals updated honestly: the sync test's FIB is auto-graded 0
+at import, so LAB001 6/12 and LAB002 10/12 after teacher grading).
+Headless-Chromium check (CDP, real server, 0 JS errors, 21/21 checks):
+Admin creates a test with FIB + theory key words via the UI (key-words
+field + new FIB label verified live); student answers; mixed submission
+routes to the teacher with auto marks (FIB 2 + theory 5, total 7/12);
+fully-auto submission goes straight to Admin (10/10); teacher grading
+shows auto marks read-only with 'Auto' tags (key words shown), grades
+only the non-auto question (total 11/12) and sends to Admin; Admin
+results show the 'Auto' tag on both rows. Lab smoke of the real
+exported STC-Lab.html: 17/17 PASS (real file:// run + real Export
+(Teacher) download + real import; imported lab submission has
+IDENTICAL auto marks / MCQ / total / status to an online submission
+with the same answers, and also goes straight to Admin).
+Screenshots: v190-keywords-field.png, v190-teacher-auto-readonly.png,
+v190-auto-tag.png in the project folder (not shipped in the ZIP).
+Version bumped to 1.9.0.

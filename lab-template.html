@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- =====================================================================
-     STC Testing System — Offline Lab App (USB sync, v1.8.0).
+     STC Testing System — Offline Lab App (USB sync, v1.9.0).
      Super Sys-Tech Computers Centre, Umerkot.
 
      SELF-CONTAINED: inline CSS + inline JS, ZERO external references,
@@ -614,7 +614,7 @@ function showSaved() {
     '<tr><th>Student</th><td>' + esc(S.student.name) + ' (' + esc(S.student.roll_number) + ')</td></tr>' +
     '<tr><th>Status</th><td><strong>Saved on this laptop.</strong></td></tr></table>' +
     '<p class="muted">Your teacher will mark this after it reaches the Admin PC (USB import). ' +
-    'MCQ marks are counted automatically there; theory and fill-in-the-blank answers are marked by your teacher.</p>';
+    'MCQ marks and answers with an answer key are counted automatically there; the rest are marked by your teacher.</p>';
   // Clear the session immediately so the next student starts blank.
   S.test = null; S.answers = {}; S.student = null;
   S.tabSwitches = 0; S.examLocked = false; S.away = false;
@@ -651,7 +651,7 @@ function exportSubmissions() {
     '-' + pad(now.getHours()) + pad(now.getMinutes());
   var envelope = {
     format: 'stc-lab-submissions',
-    version: '1.8.0',
+    version: '1.9.0',
     pack_id: (LAB_PACK && LAB_PACK.pack_id) || null,
     exported_at: now.toISOString(),
     submissions: saved
