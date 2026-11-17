@@ -1,6 +1,9 @@
-// STC Testing System — end-to-end verification script (v1.11.1: lab
-// 'Clear saved' REMOVED — lab data is never deletable (no backup), the
-// teacher PIN guards Export only; v1.11.0: course-wise student feedback
+// STC Testing System — end-to-end verification script (v1.12.0: monthly
+// student sync — CSV import upserts (existing rolls updated, not skipped),
+// reports students missing from the file, one-click remove-missing that
+// never touches submissions/reports; v1.11.1: lab 'Clear saved' REMOVED —
+// lab data is never deletable (no backup), the teacher PIN guards Export
+// only; v1.11.0: course-wise student feedback
 // PDF — roll numbers only, finalized results only;
 // v1.10.2: lab teacher PIN — pack export requires a PIN, only its
 // SHA-256 hash is embedded, the lab app asks for the PIN before Export;
@@ -83,7 +86,7 @@ async function main() {
   const h = await req('GET', '/api/health');
   check('health 200 + ok', h.status === 200 && h.json && h.json.ok === true, JSON.stringify(h.json));
   check('db backend reported', h.json && (h.json.db === 'sqlite' || h.json.db === 'json'), h.json && h.json.db);
-  check('version is 1.11.1', h.json && h.json.version === '1.11.1', h.json && h.json.version);
+  check('version is 1.12.0', h.json && h.json.version === '1.12.0', h.json && h.json.version);
   const home = await req('GET', '/');
   check('home is the Student Terminal (institute name + verify form + heading)',
     home.status === 200 && home.text.includes('Super Sys-Tech Computers Centre') &&
@@ -398,7 +401,9 @@ async function main() {
   const impL = await verify({ name: 'Comma, Test', father_name: 'Test Father', course: 'CIT', roll: 'STC-2026-102' });
   check('imported quoted-comma name verifies (full match)', impL.json && impL.json.verified && impL.json.student.name === 'Comma, Test');
   const imp2 = await req('POST', '/api/students/import', { csv }, admin.token);
-  check('re-import skips duplicates (2 skipped)', imp2.json && imp2.json.skipped === 2, JSON.stringify(imp2.json));
+  // v1.12.0: re-import UPDATES existing rolls instead of skipping them.
+  check('re-import updates duplicates (2 updated, 0 skipped, bad row still errors)',
+    imp2.json && imp2.json.updated === 2 && imp2.json.skipped === 0 && (imp2.json.errors || []).length === 1, JSON.stringify(imp2.json));
   // v1.4.2: forgiving import — "Sir " prefix, unpadded hour, lowercase course.
   const csvF = 'Roll Number,Student Name,Father\'s Name,Course,Shift,Assigned Teacher\n' +
     'STC-2026-104,Forgiving Test,Test Father,cit,9:00 AM - 10:00 AM,Sir Ashok Kumar\n';
@@ -1261,8 +1266,90 @@ async function main() {
   check('admin hint text: PIN is for Export only now',
     admFrag.includes('Teachers need this PIN to Export on lab laptops') &&
     !admFrag.includes('to Export or Clear'));
-  check('lab export envelope version is 1.11.1',
-    labSrc.includes("version: '1.11.1'"));
+  check('lab export envelope version is 1.12.0',
+    labSrc.includes("version: '1.12.0'"));
+
+  console.log('\n[30] v1.12.0 — monthly student sync: import upserts, not-in-file report, one-click remove');
+  // The user's order: tests are monthly, and every month new students join,
+  // leavers go, and roll numbers change — so the monthly re-import must
+  // reflect the real list. Setup: three fresh students (one to update, one
+  // to keep, one leaver who will be missing from the new file).
+  const mkV = async (roll, name, course, shift, teacherId) => {
+    const r = await req('POST', '/api/students', { roll_number: roll, name, father_name: name + ' Father', course, shift, teacher_id: teacherId }, admin.token);
+    if (r.status !== 201) throw new Error('setup student failed: ' + roll + ' ' + r.text);
+    return r.json.student;
+  };
+  const v1120one = await mkV('V1120-001', 'V1120 Old Name', 'DIT', '07:00 AM - 08:00 AM', tokens.kelash.id);
+  await mkV('V1120-002', 'V1120 Keeper', 'CIT', '08:00 AM - 09:00 AM', tokens.ashok.id);
+  await mkV('V1120-003', 'V1120 Leaver', 'DIT', '09:00 AM - 10:00 AM', tokens.kelash.id);
+  const csvM = 'Roll Number,Student Name,Father\'s Name,Course,Shift,Assigned Teacher\n' +
+    'V1120-001,V1120 New Name,V1120 New Father,CIT,10:00 AM - 11:00 AM,Ashok Kumar\n' +
+    'V1120-002,V1120 Keeper,V1120 Keeper Father,CIT,08:00 AM - 09:00 AM,Ashok Kumar\n' +
+    'V1120-004,V1120 Joiner,V1120 Joiner Father,DIT,07:00 AM - 08:00 AM,Kelash Kumar\n';
+  const impM = await req('POST', '/api/students/import', { csv: csvM }, admin.token);
+  check('monthly re-import: 1 imported, 2 updated, 0 skipped, 0 errors',
+    impM.json && impM.json.imported === 1 && impM.json.updated === 2 && impM.json.skipped === 0 && (impM.json.errors || []).length === 0, JSON.stringify(impM.json));
+  const allSt = await req('GET', '/api/students', null, admin.token);
+  const byRoll = {};
+  (allSt.json.students || []).forEach((s) => { byRoll[s.roll_number] = s; });
+  check('updated student keeps the SAME id with the new values',
+    byRoll['V1120-001'] && byRoll['V1120-001'].id === v1120one.id && byRoll['V1120-001'].name === 'V1120 New Name' &&
+    byRoll['V1120-001'].course === 'CIT' && byRoll['V1120-001'].shift === '10:00 AM - 11:00 AM' &&
+    byRoll['V1120-001'].teacher_name === 'Ashok Kumar', JSON.stringify(byRoll['V1120-001']));
+  check('new student added by the same import',
+    !!(byRoll['V1120-004'] && byRoll['V1120-004'].name === 'V1120 Joiner'));
+  // not_in_file must be exactly every roster roll NOT in the CSV.
+  const csvRolls = ['v1120-001', 'v1120-002', 'v1120-004'];
+  const expectedMissing = (allSt.json.students || []).map((s) => s.roll_number.toLowerCase()).filter((r) => !csvRolls.includes(r)).sort();
+  const gotMissing = (impM.json.not_in_file || []).map((m) => m.roll_number.toLowerCase()).sort();
+  check('not_in_file lists exactly the rolls missing from the CSV',
+    JSON.stringify(gotMissing) === JSON.stringify(expectedMissing), 'got ' + gotMissing.join(',') + ' expected ' + expectedMissing.join(','));
+  check('not_in_file includes the leaver with name + course',
+    (impM.json.not_in_file || []).some((m) => m.roll_number === 'V1120-003' && m.name === 'V1120 Leaver' && m.course === 'DIT'));
+  // An invalid update row errors WITHOUT changing the record.
+  const csvBad = 'Roll Number,Student Name,Father\'s Name,Course,Shift,Assigned Teacher\n' +
+    'V1120-001,V1120 Bad Update,V1120 Bad Father,DIT,25:00 PM - 26:00 PM,Kelash Kumar\n';
+  const impBad = await req('POST', '/api/students/import', { csv: csvBad }, admin.token);
+  check('invalid update row errors (bad shift), nothing updated',
+    impBad.json && impBad.json.updated === 0 && (impBad.json.errors || []).length === 1, JSON.stringify(impBad.json));
+  const afterBad = await req('GET', '/api/students?search=V1120-001', null, admin.token);
+  check('failed update left the record unchanged',
+    (afterBad.json.students || [])[0] && (afterBad.json.students || [])[0].name === 'V1120 New Name' &&
+    (afterBad.json.students || [])[0].shift === '10:00 AM - 11:00 AM', JSON.stringify((afterBad.json.students || [])[0]));
+  // remove-missing: roles + behavior.
+  const rmTeacher = await req('POST', '/api/students/remove-missing', { roll_numbers: ['V1120-003'] }, tokens.kelash.token);
+  check('remove-missing with teacher token -> 403', rmTeacher.status === 403);
+  const rmAnon = await req('POST', '/api/students/remove-missing', { roll_numbers: ['V1120-003'] });
+  check('remove-missing without token -> 401', rmAnon.status === 401);
+  const rmBad = await req('POST', '/api/students/remove-missing', { roll_numbers: ['NO-SUCH-ROLL'] }, admin.token);
+  check('remove-missing with an unknown roll removes 0, no error',
+    rmBad.status === 200 && rmBad.json && rmBad.json.removed === 0, JSON.stringify(rmBad.json));
+  // Remove the leaver AND E2E-001 (whose submission is final + in the
+  // monthly report) to prove removal never touches submissions/reports.
+  const rm = await req('POST', '/api/students/remove-missing', { roll_numbers: ['V1120-003', 'E2E-001'] }, admin.token);
+  check('remove-missing deletes exactly the listed records (2)',
+    rm.status === 200 && rm.json && rm.json.removed === 2, JSON.stringify(rm.json));
+  const afterRm = await req('GET', '/api/students', null, admin.token);
+  const rollsAfter = (afterRm.json.students || []).map((s) => s.roll_number);
+  check('removed students gone, everyone else still on the roster',
+    !rollsAfter.includes('V1120-003') && !rollsAfter.includes('E2E-001') &&
+    rollsAfter.includes('V1120-001') && rollsAfter.includes('V1120-002') && rollsAfter.includes('V1120-004') && rollsAfter.includes('E2E-002'));
+  const subsAfter = await req('GET', '/api/submissions', null, admin.token);
+  const s1After = (subsAfter.json.submissions || []).find((s) => s.id === s1.id);
+  check('removed student\'s submission survives (same id, mcq 16, final)',
+    !!(s1After && s1After.mcq_score === 16 && s1After.status === 'final'), JSON.stringify(s1After));
+  const repAfter = await req('GET', '/api/reports/monthly?month=2026-11', null, admin.token);
+  const rowAfter = (repAfter.json.rows || []).find((r) => r.roll_number === 'E2E-001');
+  check('monthly report still has the removed student\'s row (40/50)',
+    !!(rowAfter && rowAfter.total === 40 && rowAfter.max === 50), JSON.stringify(rowAfter));
+  // UI wiring (code-level).
+  const admJs = fs.readFileSync(path.join(__dirname, 'public', 'admin.js'), 'utf8');
+  check('admin UI shows the not-in-file list + Remove button wired to remove-missing',
+    admJs.includes('not_in_file') && admJs.includes('Remove these students') &&
+    admJs.includes('/api/students/remove-missing') && admJs.includes('st-remove-missing'));
+  check('admin UI shows the Updated count after import', admJs.includes('<strong>Updated:</strong>'));
+  check('admin fragment explains the monthly re-import',
+    admFrag.includes('Re-import every month'));
 
   console.log('\n========================================');
   console.log('E2E RESULT: ' + pass + ' PASS, ' + fail + ' FAIL');

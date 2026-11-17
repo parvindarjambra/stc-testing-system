@@ -47,6 +47,11 @@
 // v1.11.1: the lab 'Clear saved' button was REMOVED — lab data is never
 // deletable (no backup exists; a delete after a failed import would lose
 // students' answers forever). The teacher PIN now guards Export only.
+// v1.12.0: monthly student sync — the student CSV import now UPSERTS
+// (an existing roll number is updated, not skipped) and reports the
+// students missing from the file (not_in_file); Admin removes them in
+// one click via POST /api/students/remove-missing (roster records only —
+// submissions, marks and monthly reports are never touched).
 
 'use strict';
 
@@ -57,7 +62,7 @@ const crypto = require('crypto');
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = '0.0.0.0';
-const VERSION = '1.11.1';
+const VERSION = '1.12.0';
 const ROOT = __dirname;
 const DATA_DIR = path.join(ROOT, 'data');
 const PUBLIC_DIR = path.join(ROOT, 'public');
@@ -724,6 +729,22 @@ function createApp(store) {
       const result = importStudents(b.csv);
       return sendJson(res, 200, Object.assign({ ok: true }, result));
     }
+    // v1.12.0: one-click removal of the students an import reported as
+    // missing from the file. Deletes ONLY the listed roster records, by
+    // roll number (unknown rolls are ignored); submissions, marks and
+    // monthly reports are keyed by roll number and are NEVER touched.
+    if (method === 'POST' && pathname === '/api/students/remove-missing') {
+      if (!requireAuth(req, res, ['admin'])) return;
+      const b = await readBody(req).catch(() => null);
+      if (!b || !Array.isArray(b.roll_numbers)) return sendJson(res, 400, { ok: false, error: 'roll_numbers is required' });
+      let removed = 0;
+      for (const rn of b.roll_numbers) {
+        if (typeof rn !== 'string' || !rn.trim()) continue;
+        const s = store.findOne('students', (x) => x.roll_number.toLowerCase() === rn.trim().toLowerCase());
+        if (s) { store.remove('students', s.id); removed++; }
+      }
+      return sendJson(res, 200, { ok: true, removed });
+    }
     if (method === 'POST' && pathname === '/api/students') {
       if (!requireAuth(req, res, ['admin'])) return;
       const b = await readBody(req).catch(() => null);
@@ -1311,11 +1332,22 @@ function createApp(store) {
     return null;
   }
   // CSV student import — header mapping is case-insensitive; teacher matched by name.
+  // v1.12.0: the import UPSERTS — a row whose roll number already exists
+  // UPDATES that student (same id, new values) instead of being skipped,
+  // so the monthly re-import reflects the real list: new students join,
+  // leavers and changed roll numbers are handled by the caller. Validation
+  // runs BEFORE the upsert, so a bad row errors without touching the record.
+  // The response also lists the roster students whose roll was NOT in this
+  // file (not_in_file) — they may have left or changed roll number. They
+  // are NEVER auto-deleted; Admin removes them explicitly (remove-missing).
   function importStudents(csvText) {
     const rows = parseCsv(csvText);
-    let imported = 0, skipped = 0;
+    let imported = 0, updated = 0, skipped = 0;
     const errors = [];
-    if (rows.length === 0) return { imported, skipped, errors: [{ row: 0, error: 'empty CSV' }] };
+    // Rolls present anywhere in the file (any row with a roll value — even
+    // one that later fails validation, since that student IS on the list).
+    const rollsInFile = new Set();
+    if (rows.length === 0) return { imported, updated, skipped, errors: [{ row: 0, error: 'empty CSV' }], not_in_file: [] };
     const norm = (s) => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
     const header = rows[0].map(norm);
     const col = (names) => {
@@ -1332,7 +1364,7 @@ function createApp(store) {
     const cShift = col(['shift']);
     const cTeacher = col(['assigned teacher', 'teacher', 'teacher name']);
     if (cRoll < 0 || cName < 0) {
-      return { imported, skipped, errors: [{ row: 1, error: 'header must include "Roll Number" and "Student Name"' }] };
+      return { imported, updated, skipped, errors: [{ row: 1, error: 'header must include "Roll Number" and "Student Name"' }], not_in_file: [] };
     }
     const teachers = store.find('users', (u) => u.role === 'teacher');
     // Assigned Teacher matches by username OR full name (case-insensitive).
@@ -1374,8 +1406,8 @@ function createApp(store) {
       const course = cCourse >= 0 ? normalizeCourse(row[cCourse]) : '';
       const shift = cShift >= 0 ? normalizeShift(row[cShift]) : '';
       const teacherNameVal = cTeacher >= 0 ? String(row[cTeacher] || '').trim() : '';
+      if (roll) rollsInFile.add(roll.toLowerCase());
       if (!roll || !name) { errors.push({ row: r + 1, error: 'missing roll number or student name' }); continue; }
-      if (store.findOne('students', (s) => s.roll_number.toLowerCase() === roll.toLowerCase())) { skipped++; continue; }
       if (!course) { errors.push({ row: r + 1, error: 'missing course' }); continue; }
       if (!SHIFTS.includes(shift)) { errors.push({ row: r + 1, error: 'invalid shift: ' + shift }); continue; }
       // A named teacher that does not exist rejects the row — silently
@@ -1385,13 +1417,23 @@ function createApp(store) {
         teacherId = findTeacher(teacherNameVal);
         if (!teacherId) { errors.push({ row: r + 1, error: 'unknown teacher: ' + teacherNameVal }); continue; }
       }
-      store.insert('students', {
-        id: newId(), roll_number: roll, name, father_name: father, course, shift,
-        teacher_id: teacherId,
-      });
-      imported++;
+      const existing = store.findOne('students', (s) => s.roll_number.toLowerCase() === roll.toLowerCase());
+      if (existing) {
+        store.update('students', existing.id, {
+          roll_number: roll, name, father_name: father, course, shift, teacher_id: teacherId,
+        });
+        updated++;
+      } else {
+        store.insert('students', {
+          id: newId(), roll_number: roll, name, father_name: father, course, shift,
+          teacher_id: teacherId,
+        });
+        imported++;
+      }
     }
-    return { imported, skipped, errors };
+    const not_in_file = store.find('students', (s) => !rollsInFile.has(s.roll_number.toLowerCase()))
+      .map((s) => ({ roll_number: s.roll_number, name: s.name, course: s.course }));
+    return { imported, updated, skipped, errors, not_in_file };
   }
 
   // CSV teacher import — creates teacher accounts.

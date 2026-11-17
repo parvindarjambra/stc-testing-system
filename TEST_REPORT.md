@@ -891,6 +891,64 @@ Screenshots: v1100-already-taken.png, v1100-draft-restored.png in the
 project folder (not shipped in the ZIP).
 Version bumped to 1.10.0.
 
+## v1.12.0 (2026-11-16) — Monthly student sync (import upserts, not-in-file report, one-click remove)
+
+User order (20:27 PST): tests are monthly, and for every monthly test
+the students must be re-imported — new students join, some finish their
+course and leave, and the centre admin updates some roll numbers. Until
+now the import SKIPPED any row whose roll number already existed and
+never removed anyone, so re-importing a changed list silently did
+nothing for existing students and leavers / old roll numbers stayed in
+the list (and in every lab pack) forever.
+
+What changed: the student CSV import now UPSERTS — a row whose roll
+number already exists UPDATES that student (name, father's name,
+course, shift, assigned teacher; same id) instead of being skipped.
+Validation runs BEFORE the upsert with the same rules as new rows, so a
+bad row errors without touching the record. The response reports
+`imported` (new), `updated`, `skipped` (kept for compatibility — 0 in
+practice) and `errors`, plus `not_in_file`: the roster students whose
+roll number was NOT in the imported file, each with roll number, name
+and course. The Admin Students tab shows that list under the import
+result ("These students were not in this file — they may have left or
+changed roll number:") with a **Remove these students** button that
+appears ONLY when the list is non-empty; clicking it confirms with the
+count, then calls the new Admin-only POST /api/students/remove-missing
+(delete by roll number, unknown rolls ignored, returns the removed
+count). Removal deletes ONLY roster records — submissions, marks and
+monthly reports are keyed by roll number and are never touched. Nobody
+is ever auto-deleted by an import. The lab pack still includes ALL
+students and ALL tests (unchanged).
+
+Honest limits: (a) a changed roll number imports as a NEW student —
+the old roll appears in 'not in file' and Admin removes it with the
+same button; (b) removing a student removes only the roster record —
+their past submissions, marks and monthly reports stay.
+
+Tests: E2E 359 PASS, 0 FAIL (was 342; +17 in new §30 — monthly
+re-import counts, updated record keeps the same id with new values, new
+student added, not_in_file lists exactly the missing rolls, leaver
+listed with name + course, invalid update row errors without changing
+the record, remove-missing 403 teacher / 401 anonymous / unknown roll
+removes 0, deletes exactly the listed records, submission + monthly
+report survive the removal, admin UI wiring + Updated count + monthly
+hint; the §13 re-import check now asserts 2 updated, 0 skipped).
+e2e-sync-test.js 62 PASS, 0 FAIL (unchanged — the lab loop is
+untouched). Headless-Chromium check (CDP, real server, 0 JS errors,
+13/13 checks): Students tab lists the seeded students; import of a
+monthly CSV (1 new + 2 updated + 1 missing) shows Imported: 1,
+Updated: 2, Skipped: 0, the leaver in the not-in-file list and the
+Remove button; confirm + remove deletes only the leaver; the updated
+student's new name/course/shift/teacher and the new student show in the
+list. Lab smoke of the real exported STC-Lab.html (file://, 0 JS
+errors, 13/13 checks): zero external refs, no answer keys, PIN hash in
+/ plain PIN out, no Clear button, wrong roll locks, submit saves,
+result screen shows no scores, Export PIN flow, exported JSON imports
+cleanly (FIB auto-graded, theory routed to teacher).
+Screenshot: v1120-import-result.png in the project folder (not shipped
+in the ZIP).
+Version bumped to 1.12.0.
+
 ## v1.11.1 (2026-11-16) — Lab data is never deletable (Clear saved removed)
 
 User order (20:13 PST): "data delete nahi honi chahiye, backup nahi

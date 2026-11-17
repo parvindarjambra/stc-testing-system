@@ -1,6 +1,7 @@
-// STC Testing System — USB-sync verification script (v1.11.1: Clear saved
-// removed — lab data never deletable, PIN is Export only; lab loop
-// otherwise unchanged; v1.11.0: feedback PDF — lab loop unchanged;
+// STC Testing System — USB-sync verification script (v1.12.0: monthly
+// student sync — lab loop unchanged; v1.11.1: Clear saved removed — lab
+// data never deletable, PIN is Export only; v1.11.0: feedback PDF — lab
+// loop unchanged;
 // v1.10.2: lab teacher PIN — pack export requires a PIN, only its
 // SHA-256 hash is embedded;
 // v1.10.1: theory always teacher-graded — stored key words ignored at
@@ -66,7 +67,7 @@ async function main() {
 
   console.log('\n[1] Health + admin login');
   const h = await req('GET', '/api/health');
-  check('health 200 + version 1.11.1', h.status === 200 && h.json && h.json.version === '1.11.1', h.json && h.json.version);
+  check('health 200 + version 1.12.0', h.status === 200 && h.json && h.json.version === '1.12.0', h.json && h.json.version);
   const admin = await login('admin', 'admin123', 'admin');
   check('admin login', !!(admin && admin.token));
   if (!admin) { console.log('FATAL: admin login failed'); process.exit(1); }
@@ -145,7 +146,7 @@ async function main() {
   //   submitted_at }, wrapped in the export envelope.
   const nowIso = new Date().toISOString();
   const envelope = {
-    format: 'stc-lab-submissions', version: '1.11.1', pack_id: packId,
+    format: 'stc-lab-submissions', version: '1.12.0', pack_id: packId,
     exported_at: nowIso,
     submissions: [
       {
@@ -300,7 +301,7 @@ async function main() {
   // (Their first submissions are now final / sent_to_admin — the block
   // applies whatever the grading status.)
   const dupEnvelope = {
-    format: 'stc-lab-submissions', version: '1.11.1', pack_id: packId,
+    format: 'stc-lab-submissions', version: '1.12.0', pack_id: packId,
     exported_at: nowIso,
     submissions: [
       {

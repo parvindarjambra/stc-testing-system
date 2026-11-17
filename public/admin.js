@@ -210,17 +210,46 @@ function importStudentsCsv() {
   reader.onload = async () => {
     try {
       const d = await api('/api/students/import', { method: 'POST', body: { csv: String(reader.result) } });
-      let html = '<p><strong>Imported:</strong> ' + d.imported + ' &nbsp; <strong>Skipped:</strong> ' + d.skipped + '</p>';
+      // v1.12.0: the import upserts — existing roll numbers are updated,
+      // and students missing from the file are listed for one-click removal.
+      let html = '<p><strong>Imported:</strong> ' + d.imported + ' &nbsp; <strong>Updated:</strong> ' + (d.updated || 0) + ' &nbsp; <strong>Skipped:</strong> ' + d.skipped + '</p>';
       if (d.errors && d.errors.length) {
         html += '<p class="err">Errors:</p><ul>' + d.errors.map((er) =>
           '<li class="err">Row ' + er.row + ': ' + esc(er.error) + '</li>').join('') + '</ul>';
       }
+      const missing = d.not_in_file || [];
+      if (missing.length) {
+        S.missingRolls = missing.map((m) => m.roll_number);
+        html += '<p><strong>These students were not in this file — they may have left or changed roll number:</strong></p><ul>' +
+          missing.map((m) => '<li>' + esc(m.roll_number) + ' — ' + esc(m.name) + ' (' + esc(m.course) + ')</li>').join('') + '</ul>' +
+          '<p><button class="btn btn-danger" type="button" id="st-remove-missing">Remove these students</button></p>';
+      } else {
+        S.missingRolls = [];
+      }
       $('st-csv-result').innerHTML = html;
-      toast('Import done: ' + d.imported + ' imported, ' + d.skipped + ' skipped.', true);
+      const rmBtn = $('st-remove-missing');
+      if (rmBtn) rmBtn.addEventListener('click', removeMissingStudents);
+      toast('Import done: ' + d.imported + ' imported, ' + (d.updated || 0) + ' updated, ' + d.skipped + ' skipped.', true);
       loadStudents();
     } catch (err) { toast('Import failed: ' + err.message, false); }
   };
   reader.readAsText(file);
+}
+
+// v1.12.0: one-click removal of the students the last import reported as
+// missing from the file. Only the roster records are deleted — past
+// submissions, marks and monthly reports are never touched.
+async function removeMissingStudents() {
+  const rolls = S.missingRolls || [];
+  if (!rolls.length) return;
+  if (!confirm('Remove ' + rolls.length + ' student(s) who were not in this file? Their past submissions, marks and monthly reports will stay.')) return;
+  try {
+    const d = await api('/api/students/remove-missing', { method: 'POST', body: { roll_numbers: rolls } });
+    toast('Removed ' + d.removed + ' student(s).', true);
+    S.missingRolls = [];
+    $('st-csv-result').innerHTML = '<p><strong>Removed:</strong> ' + d.removed + ' student(s) who were not in the file. Their past submissions and reports are untouched.</p>';
+    loadStudents();
+  } catch (err) { toast('Remove failed: ' + err.message, false); }
 }
 
 /* ----- Test Builder ----- */
