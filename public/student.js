@@ -119,6 +119,10 @@ function initStudent() {
   });
 
   $('stu-confirm').addEventListener('click', () => loadTestPicker());
+  // v1.13.0: the picker's New Student button resets to the verify form
+  // (shared laptops: after 'already taken' the next student must be able
+  // to start). This reset exists ONLY on the picker — never mid-exam.
+  $('stu-new-student').addEventListener('click', resetStudent);
   // No back / change-details control here by design (v1.7.0): once
   // verified, the student can only go forward (Confirm -> test picker
   // -> exam -> submit -> reset for the next student). Details come from
@@ -427,6 +431,9 @@ function showAlreadyTaken() {
     '<table><tr><th>Test</th><td>' + esc(testLabel(S.test)) + '</td></tr>' +
     '<tr><th>Student</th><td>' + esc(S.student.name) + ' (' + esc(S.student.roll_number) + ')</td></tr></table>' +
     '<p class="muted">Each student can take a test only once. Your earlier answers are already with your teacher.</p>';
+  // v1.13.0: the next student on this shared laptop starts over from the
+  // verify form — the button says so plainly on this screen.
+  $('stu-result-done').textContent = 'New Student — Start Over';
   // Clear the session immediately so the next student starts blank.
   sessionStorage.clear();
   S.token = null; S.user = null;
@@ -441,6 +448,7 @@ function showLockedScreen(offline) {
   $('stu-exam').classList.add('hidden');
   $('stu-result').classList.remove('hidden');
   $('stu-result-title').textContent = 'Test Locked';
+  $('stu-result-done').textContent = 'Start Next Student';
   $('stu-result-body').innerHTML =
     '<p><strong>Your test has been locked because you left the exam page. Your answers have been submitted.</strong></p>' +
     '<table><tr><th>Test</th><td>' + esc(testLabel(S.test)) + '</td></tr>' +
@@ -459,6 +467,7 @@ function showResult(sub, offline) {
   hideAcWarning();
   $('stu-exam').classList.add('hidden');
   $('stu-result').classList.remove('hidden');
+  $('stu-result-done').textContent = 'Start Next Student';
   const body = $('stu-result-body');
   if (offline) {
     body.innerHTML = '<p><strong>Saved offline — will sync automatically.</strong></p>' +
@@ -484,6 +493,7 @@ function showResult(sub, offline) {
 function resetStudent() {
   hideAcWarning();
   $('stu-result-title').textContent = 'Result Summary';
+  $('stu-result-done').textContent = 'Start Next Student';
   $('stu-result').classList.add('hidden');
   $('stu-tests').classList.add('hidden');
   $('stu-exam').classList.add('hidden');
@@ -506,33 +516,15 @@ function resetStudent() {
 /* ---------------- Student page init ---------------- */
 document.addEventListener('DOMContentLoaded', () => {
   initStudent();
-  initStaffMenu();
   initTerminalVersion();
   $('btn-sync-now').addEventListener('click', () => flushQueue());
   updateQueueBadge();
   flushQueue();   // try to sync any queued submissions right away
 });
 
-/* Staff / Faculty Login dropdown (terminal header, top-right). The only
-   staff entry point on this page: Teacher, Admin, Principal. */
-function initStaffMenu() {
-  const btn = $('staff-menu-btn');
-  const menu = $('staff-menu-list');
-  if (!btn || !menu) return;
-  const close = () => {
-    menu.classList.add('hidden');
-    btn.setAttribute('aria-expanded', 'false');
-  };
-  btn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    const isHidden = menu.classList.toggle('hidden');
-    btn.setAttribute('aria-expanded', String(!isHidden));
-  });
-  document.addEventListener('click', (e) => {
-    if (!menu.classList.contains('hidden') && !menu.contains(e.target)) close();
-  });
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
-}
+/* v1.13.0: the staff logins are three plain links in the terminal header
+   (Teacher / Admin / Principal) — the old single staff-login dropdown
+   was removed, so no menu JavaScript is needed here. */
 
 /* Tiny footer version line, filled from the server health endpoint. */
 function initTerminalVersion() {

@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- =====================================================================
-     STC Testing System — Offline Lab App (USB sync, v1.12.0).
+     STC Testing System — Offline Lab App (USB sync, v1.13.0).
      Super Sys-Tech Computers Centre, Umerkot.
 
      SELF-CONTAINED: inline CSS + inline JS, ZERO external references,
@@ -25,6 +25,10 @@
      saved submissions can never be deleted from this laptop (no backup
      exists). The laptop keeps every submission; the Admin PC holds the
      main copy after import.
+     v1.13.0: sticky submit bar (the Submit button is always visible at
+     the bottom of the screen during an exam — it was reported hidden on
+     a real laptop) + a 'New Student' reset on the test picker only
+     (never during an exam), for the next student on a shared laptop.
      ===================================================================== -->
 <html lang="en">
 <head>
@@ -91,8 +95,18 @@ th { color: #475569; font-weight: 600; width: 38%; }
 .opt { display: block; padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 6px; cursor: pointer; font-weight: 400; }
 .opt:hover { background: #f8fafc; }
 .opt input { margin-right: 8px; }
-.exam-actions { margin-top: 16px; }
-.toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #0f172a; color: #fff; padding: 12px 20px; border-radius: 10px; font-size: 14px; z-index: 50; max-width: 90vw; text-align: center; }
+/* Sticky submit bar (v1.13.0): the Submit button is ALWAYS visible at the
+   bottom of the screen during an exam, however far the student has
+   scrolled — a hidden/white submit button was reported on a real laptop
+   (it worked when clicked, but the student could not see it). Solid teal,
+   no gradient, so it can never render as a blank white box. The bar lives
+   inside #stu-exam, so it shows/hides with the exam screen. */
+.exam-sticky-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; background: #fff; border-top: 1px solid #e2e8f0; box-shadow: 0 -4px 16px rgba(15, 23, 42, 0.12); padding: 12px 20px; }
+.exam-sticky-inner { max-width: 960px; margin: 0 auto; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.exam-sticky-bar .btn-primary { background: #059669; }
+#exam-submit:disabled { background: #94a3b8; opacity: 1; cursor: not-allowed; }
+#stu-exam { padding-bottom: 90px; } /* room for the sticky bar, so the last question is never covered by it */
+.toast { position: fixed; left: 50%; bottom: 88px; transform: translateX(-50%); background: #0f172a; color: #fff; padding: 12px 20px; border-radius: 10px; font-size: 14px; z-index: 50; max-width: 90vw; text-align: center; }
 /* Blocking modal (v1.8.0: anti-cheat warning). */
 .modal-overlay { position: fixed; inset: 0; z-index: 100; background: rgba(15, 23, 42, 0.72); display: flex; align-items: center; justify-content: center; padding: 20px; }
 .modal-card { background: #fff; border-radius: 16px; padding: 28px; max-width: 480px; width: 100%; text-align: center; box-shadow: 0 10px 30px rgba(15, 23, 42, 0.3); }
@@ -180,6 +194,14 @@ th { color: #475569; font-weight: 600; width: 38%; }
   <div id="stu-tests" class="hidden">
     <h2>Select Your Test</h2>
     <p id="stu-tests-who" class="muted"></p>
+    <!-- v1.13.0: next-student reset — after 'You have already taken this
+         test.' the student was stranded on the picker with no way for the
+         NEXT student to start (shared laptops). This button clears the
+         verified session and returns to the verify form. It exists ONLY
+         on the picker — NEVER during an active exam. -->
+    <div class="btn-row">
+      <button class="btn" type="button" id="stu-new-student">← New Student</button>
+    </div>
     <div id="stu-test-list" class="card-grid"></div>
   </div>
 
@@ -192,9 +214,15 @@ th { color: #475569; font-weight: 600; width: 38%; }
     <p id="exam-meta" class="muted"></p>
     <div id="exam-palette" class="palette"></div>
     <div id="exam-questions"></div>
-    <div class="exam-actions">
-      <button class="btn btn-primary btn-big" type="button" id="exam-submit">Submit Exam</button>
-      <p class="muted">Your exam submits automatically when time runs out. Your answers are saved on this laptop only.</p>
+    <!-- v1.13.0: sticky submit bar — the Submit button is always visible
+         at the bottom of the screen during the exam (the old in-flow
+         button below the last question was reported hidden on a real
+         laptop). No back/reset control here by design: never mid-exam. -->
+    <div class="exam-sticky-bar">
+      <div class="exam-sticky-inner">
+        <button class="btn btn-primary btn-big" type="button" id="exam-submit">Submit Exam</button>
+        <span class="muted">Your exam submits automatically when time runs out. Your answers are saved on this laptop only.</span>
+      </div>
     </div>
   </div>
 
@@ -423,6 +451,10 @@ function initLab() {
   });
 
   $('stu-confirm').addEventListener('click', loadTestPicker);
+  /* v1.13.0: the picker's New Student button resets to the verify form
+     (shared laptops: after 'already taken' the next student must be able
+     to start). This reset exists ONLY on the picker — never mid-exam. */
+  $('stu-new-student').addEventListener('click', resetStudent);
   /* No back / change-details control here by design (v1.7.0): once
      verified, the student can only go forward (Confirm -> test picker
      -> exam -> submit -> reset for the next student). Details come from
@@ -912,7 +944,7 @@ function exportSubmissions() {
     '-' + pad(now.getHours()) + pad(now.getMinutes());
   var envelope = {
     format: 'stc-lab-submissions',
-    version: '1.12.0',
+    version: '1.13.0',
     pack_id: (LAB_PACK && LAB_PACK.pack_id) || null,
     exported_at: now.toISOString(),
     submissions: saved

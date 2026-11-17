@@ -891,6 +891,87 @@ Screenshots: v1100-already-taken.png, v1100-draft-restored.png in the
 project folder (not shipped in the ZIP).
 Version bumped to 1.10.0.
 
+## v1.13.0 (2026-11-16) — Sticky submit bar, next-student reset, prominent staff logins
+
+Three user-reported fixes from his own screenshots on his PC (20:35 PST).
+
+Fix 1 — exam Submit button invisible (lab app): on his real laptop the
+lab exam's Submit button WORKED when clicked but was HIDDEN — his
+screenshot showed a blank white box below the last question. The button
+existed (`btn btn-primary btn-big`, id `exam-submit`) and `.btn-primary`
+was defined in the template's embedded CSS (teal gradient) — so the fix
+was reproduced first: the current template was opened headlessly at
+1366x768 with a 3-question exam and answers typed. The bug did NOT
+reproduce with the current template — the button rendered as a clear
+teal gradient button with white text, in the viewport, 0 JS errors. His
+pack file was an older export (`STC-Lab (1).html`): packs are snapshots,
+so an old file never picks up fixes. The button was still made
+UNMISSABLE: a sticky bottom bar now holds it during the exam — fixed to
+the viewport bottom, white bar with a top border + shadow, solid teal
+(`#059669`, no gradient, so it can never render as a blank white box)
+'Submit Exam' button with white text, always visible however far the
+student has scrolled, plus a clearly visible disabled state (solid grey
+`#94a3b8`, full opacity). The same sticky bar was applied to the online
+terminal exam (same design language, same risk). The exam screens got
+90px of bottom padding so the last question is never covered by the
+bar, and the lab toast was raised above the bar (bottom 88px). The old
+in-flow button below the last question is gone (single button, same id
+— submit/disable wiring unchanged).
+
+Fix 2 — next-student reset: after 'You have already taken this test.'
+the student was stranded on the picker with no way for the NEXT student
+to start (shared laptops). A '← New Student' button is now on the test
+picker (lab app + online terminal) — it clears the verified session and
+returns to the verify form with empty fields. The online Already Taken
+screen's button now reads 'New Student — Start Over' (same reset). RULE:
+this reset exists ONLY on the picker / already-taken screens — NEVER
+during an active exam (no back/change mid-exam; anti-cheat +
+one-attempt stand — the exam screens contain only the Submit button
+plus the palette dots).
+
+Fix 3 — staff logins prominent: the user asked why the Admin laptop's
+home page is the student test form ('admin thori test dega'). The
+student verification form stays as the page (Wi-Fi laptops still use it
+as the student terminal), but the single 'Staff / Faculty Login'
+dropdown in the top bar is replaced by three clearly labeled buttons:
+'Teacher Login', 'Admin Login', 'Principal Login', each linking to its
+portal (plain links, no JavaScript — `initStaffMenu` removed). The lab
+app is student-only and untouched.
+
+IMPORTANT — old packs are snapshots: after this update the Admin must
+export a FRESH lab pack (USB Lab Sync) and re-copy it to the laptops —
+old STC-Lab.html files on the laptops do not get the sticky bar or the
+New Student button.
+
+Tests: E2E 376 PASS, 0 FAIL (was 359; +17 in new §31 — sticky submit
+bar present in lab + online exam screens, fixed-bottom + solid-teal CSS,
+solid-grey disabled state, lab toast above the bar, New Student button
+on the lab + online pickers wired to resetStudent, Already Taken button
+reads 'New Student — Start Over', NO reset/back control in either exam
+screen, three staff login buttons with the right portal links, dropdown
+gone, no staff-menu code left in student.js; the §1 terminal check now
+asserts the three buttons + no dropdown). e2e-sync-test.js 62 PASS,
+0 FAIL (unchanged — the lab loop is untouched). Headless-Chromium
+check (CDP, real server, 0 JS errors, 29/29 checks): lab @1366x768 and
+@1280x900 — Submit button inside the viewport mid-exam with a solid
+teal background + white text, bar fixed at the viewport bottom, button
+STILL visible after scrolling to the top, no reset control during the
+exam, submit via the sticky bar saves; lab + online picker New Student
+reset returns to a fresh verify form; online Already Taken screen
+(409 triggered via a parallel API submit) shows 'New Student — Start
+Over' and resets; the three staff login buttons navigate to
+/teacher, /admin and /principal login pages. Lab smoke of the real
+exported STC-Lab.html (file://, 0 JS errors, 17/17 checks — was 13, +4:
+pack carries the sticky bar + New Student button, picker shows the
+button, Submit visible mid-exam): zero external refs, no answer keys,
+PIN hash in / plain PIN out, no Clear button, wrong roll locks, submit
+saves, result screen shows no scores, Export PIN flow, exported JSON
+imports cleanly (FIB auto-graded, theory routed to teacher).
+Screenshots: v1130-submit-visible-1366.png, v1130-submit-visible-1280.png,
+v1130-picker-new-student.png, v1130-staff-logins.png in the project
+folder (not shipped in the ZIP).
+Version bumped to 1.13.0.
+
 ## v1.12.0 (2026-11-16) — Monthly student sync (import upserts, not-in-file report, one-click remove)
 
 User order (20:27 PST): tests are monthly, and for every monthly test

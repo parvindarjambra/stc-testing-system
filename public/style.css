@@ -368,7 +368,17 @@ tr.clickable:hover td { background: #f0fdfa; }
 .q-marks { float: right; font-size: 13px; color: var(--grey); font-weight: 600; }
 .opt { display: flex; gap: 9px; align-items: flex-start; margin: 7px 0; font-weight: 400; cursor: pointer; }
 .opt input { width: auto; margin: 4px 0 0; }
-.exam-actions { text-align: center; margin: 20px 0; }
+/* Sticky submit bar (v1.13.0): the Submit button is ALWAYS visible at the
+   bottom of the screen during an exam, however far the student has
+   scrolled — a hidden/white submit button was reported on a real laptop
+   (it worked when clicked, but the student could not see it). Solid teal,
+   no gradient, so it can never render as a blank white box. The bar lives
+   inside #stu-exam, so it shows/hides with the exam screen. */
+.exam-sticky-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; background: #fff; border-top: 1px solid var(--line); box-shadow: 0 -4px 16px rgba(15, 23, 42, 0.12); padding: 12px 20px; }
+.exam-sticky-inner { max-width: 1160px; margin: 0 auto; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.exam-sticky-bar .btn-primary { background: #059669; }
+#exam-submit:disabled { background: #94a3b8; opacity: 1; cursor: not-allowed; transform: none; }
+#stu-exam { padding-bottom: 90px; } /* room for the sticky bar, so the last question is never covered by it */
 
 /* ---------- Grading ---------- */
 .grade-q { border: 1px solid var(--line); border-radius: 16px; padding: 16px; margin-bottom: 14px; background: #fff; }
@@ -569,7 +579,8 @@ body.console-mode .toast { max-width: none; margin-left: 20px; margin-right: 20p
 
 /* ---------- Student Terminal (home page: / and /student) ---------- */
 /* Dark navy full page. Students see ONLY the roll-number terminal here;
-   staff portals live behind the single "Staff / Faculty Login" menu. */
+   staff portals have three clearly labeled login buttons top-right
+   (v1.13.0 — the old single staff-login dropdown is gone). */
 body.terminal-mode {
   background-color: #0a0f1e;
   background-image:
@@ -581,7 +592,7 @@ body.terminal-mode {
 }
 body.terminal-mode main { flex: 1; width: 100%; }
 
-/* Slim terminal header: logo + institute name left, staff menu right. */
+/* Slim terminal header: logo + institute name left, staff login buttons right. */
 .terminal-header { padding: 12px 20px; }
 .terminal-header .header-inner { align-items: center; }
 .terminal-header .header-logo-chip { width: 56px; height: 56px; flex-basis: 56px; border-radius: 14px; padding: 5px; }
@@ -590,9 +601,10 @@ body.terminal-mode main { flex: 1; width: 100%; }
 .terminal-header-right { display: flex; gap: 10px; align-items: center; margin-left: auto; flex: 0 0 auto; }
 .terminal-header-right .queue-badge { white-space: nowrap; }
 
-/* The one staff entry point on the terminal: a small discreet pill button
-   with a dropdown (Teacher / Admin / Principal). */
-.staff-menu { position: relative; }
+/* Staff logins on the terminal (v1.13.0): three clearly labeled pill
+   buttons — Teacher / Admin / Principal — instead of the old single
+   staff-login dropdown that hid the portals. */
+.staff-logins { display: flex; gap: 8px; flex-wrap: wrap; }
 .staff-btn {
   background: rgba(255, 255, 255, 0.07);
   border: 1px solid rgba(255, 255, 255, 0.22);
@@ -600,22 +612,11 @@ body.terminal-mode main { flex: 1; width: 100%; }
   border-radius: 9999px;
   padding: 8px 16px;
   font-size: 13.5px; font-weight: 700; font-family: inherit;
-  cursor: pointer; white-space: nowrap;
+  cursor: pointer; white-space: nowrap; text-decoration: none;
+  display: inline-block;
   transition: border-color .2s, background-color .2s;
 }
 .staff-btn:hover { border-color: var(--teal-bright); background: rgba(255, 255, 255, 0.12); color: #fff; }
-.staff-dropdown {
-  position: absolute; right: 0; top: calc(100% + 8px);
-  background: #fff; border: 1px solid var(--line-soft);
-  border-radius: 14px; box-shadow: var(--shadow-pop);
-  min-width: 230px; padding: 6px; z-index: 100;
-}
-.staff-dropdown a {
-  display: block; padding: 11px 13px; border-radius: 10px;
-  color: var(--navy2); text-decoration: none;
-  font-size: 14px; font-weight: 700;
-}
-.staff-dropdown a:hover { background: #f0fdfa; color: var(--teal); }
 
 /* Centered dark verify card (reference look, our emerald brand). */
 .terminal-card {

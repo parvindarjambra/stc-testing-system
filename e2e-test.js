@@ -1,7 +1,13 @@
-// STC Testing System — end-to-end verification script (v1.12.0: monthly
-// student sync — CSV import upserts (existing rolls updated, not skipped),
-// reports students missing from the file, one-click remove-missing that
-// never touches submissions/reports; v1.11.1: lab 'Clear saved' REMOVED —
+// STC Testing System — end-to-end verification script (v1.13.0: sticky
+// submit bar (lab + online terminal) — the Submit button is always
+// visible at the bottom of the screen during an exam; 'New Student'
+// reset on the test picker (lab + online) and the online Already Taken
+// screen — never mid-exam; the terminal's 'Staff / Faculty Login'
+// dropdown is replaced by three labeled buttons (Teacher / Admin /
+// Principal Login); v1.12.0: monthly student sync — CSV import upserts
+// (existing rolls updated, not skipped), reports students missing from
+// the file, one-click remove-missing that never touches submissions/
+// reports; v1.11.1: lab 'Clear saved' REMOVED —
 // lab data is never deletable (no backup), the teacher PIN guards Export
 // only; v1.11.0: course-wise student feedback
 // PDF — roll numbers only, finalized results only;
@@ -86,14 +92,16 @@ async function main() {
   const h = await req('GET', '/api/health');
   check('health 200 + ok', h.status === 200 && h.json && h.json.ok === true, JSON.stringify(h.json));
   check('db backend reported', h.json && (h.json.db === 'sqlite' || h.json.db === 'json'), h.json && h.json.db);
-  check('version is 1.12.0', h.json && h.json.version === '1.12.0', h.json && h.json.version);
+  check('version is 1.13.0', h.json && h.json.version === '1.13.0', h.json && h.json.version);
   const home = await req('GET', '/');
   check('home is the Student Terminal (institute name + verify form + heading)',
     home.status === 200 && home.text.includes('Super Sys-Tech Computers Centre') &&
     home.text.includes('stu-verify-form') && home.text.includes('Candidate Identity Verification'));
-  check('terminal has Staff / Faculty Login control with 3 portal links',
-    home.text.includes('Staff / Faculty Login') &&
-    ['/teacher', '/admin', '/principal'].every((p) => home.text.includes('href="' + p + '"')));
+  check('terminal has three staff login buttons (Teacher / Admin / Principal), no dropdown',
+    home.text.includes('Teacher Login') && home.text.includes('Admin Login') && home.text.includes('Principal Login') &&
+    ['/teacher', '/admin', '/principal'].every((p) => home.text.includes('href="' + p + '"')) &&
+    !home.text.includes('Staff / Faculty Login') && !home.text.includes('staff-dropdown') &&
+    !home.text.includes('staff-menu-btn'));
   check('terminal has NO portal cards',
     !home.text.includes('portal-card') && !home.text.includes('Choose your portal'));
   check('terminal has NO portal console content',
@@ -1266,8 +1274,8 @@ async function main() {
   check('admin hint text: PIN is for Export only now',
     admFrag.includes('Teachers need this PIN to Export on lab laptops') &&
     !admFrag.includes('to Export or Clear'));
-  check('lab export envelope version is 1.12.0',
-    labSrc.includes("version: '1.12.0'"));
+  check('lab export envelope version is 1.13.0',
+    labSrc.includes("version: '1.13.0'"));
 
   console.log('\n[30] v1.12.0 — monthly student sync: import upserts, not-in-file report, one-click remove');
   // The user's order: tests are monthly, and every month new students join,
@@ -1350,6 +1358,75 @@ async function main() {
   check('admin UI shows the Updated count after import', admJs.includes('<strong>Updated:</strong>'));
   check('admin fragment explains the monthly re-import',
     admFrag.includes('Re-import every month'));
+
+  console.log('\n[31] v1.13.0 — sticky submit bar, next-student reset, prominent staff logins');
+  // Three user-reported fixes from his own screenshots on his PC.
+  // (1) The lab exam's Submit button was reported HIDDEN on a real laptop
+  // (it worked when clicked, but showed as a blank white box). The fix is
+  // a sticky bottom bar holding a solid-teal Submit button, always visible
+  // during the exam — in the lab app AND the online terminal. (The bug did
+  // NOT reproduce with the current template in headless Chromium at
+  // 1366x768 — his pack file was an older export; packs are snapshots, so
+  // after this update Admin must export a FRESH lab pack.)
+  // (2) After 'already taken' the student was stranded on the picker with
+  // no way for the NEXT student to start. (3) The terminal's single
+  // 'Staff / Faculty Login' dropdown hid the staff portals.
+  const styleCss = fs.readFileSync(path.join(__dirname, 'public', 'style.css'), 'utf8');
+  const labExam = labSrc.slice(labSrc.indexOf('id="stu-exam"'), labSrc.indexOf('<!-- Step 4'));
+  const onExam = stuHtml.slice(stuHtml.indexOf('id="stu-exam"'), stuHtml.indexOf('<!-- Step 4'));
+  check('lab exam has a sticky submit bar holding the Submit button',
+    labSrc.includes('class="exam-sticky-bar"') &&
+    labSrc.indexOf('exam-sticky-bar') < labSrc.indexOf('id="exam-submit"') &&
+    !labSrc.includes('exam-actions'));
+  check('lab sticky bar CSS: fixed to the viewport bottom, solid teal button',
+    labSrc.includes('.exam-sticky-bar { position: fixed; left: 0; right: 0; bottom: 0;') &&
+    labSrc.includes('.exam-sticky-bar .btn-primary { background: #059669; }'));
+  check('lab disabled Submit state is solid grey (clearly visible, clearly disabled)',
+    labSrc.includes('#exam-submit:disabled { background: #94a3b8; opacity: 1;'));
+  check('lab toast sits above the sticky bar (bottom 88px)',
+    labSrc.includes('.toast { position: fixed; left: 50%; bottom: 88px;'));
+  check('online exam has a sticky submit bar holding the Submit button',
+    stuHtml.includes('class="exam-sticky-bar"') &&
+    stuHtml.indexOf('exam-sticky-bar') < stuHtml.indexOf('id="exam-submit"') &&
+    !stuHtml.includes('exam-actions'));
+  check('online sticky bar CSS in style.css: fixed bottom, solid teal button',
+    styleCss.includes('.exam-sticky-bar { position: fixed; left: 0; right: 0; bottom: 0;') &&
+    styleCss.includes('.exam-sticky-bar .btn-primary { background: #059669; }'));
+  check('online disabled Submit state is solid grey in style.css',
+    styleCss.includes('#exam-submit:disabled { background: #94a3b8; opacity: 1;'));
+  check('lab picker has a New Student button (inside the picker, before the test list)',
+    labSrc.indexOf('id="stu-tests"') < labSrc.indexOf('id="stu-new-student"') &&
+    labSrc.indexOf('id="stu-new-student"') < labSrc.indexOf('id="stu-test-list"') &&
+    labSrc.includes('>← New Student</button>'));
+  check('lab New Student button resets to the verify form',
+    labSrc.includes("$('stu-new-student').addEventListener('click', resetStudent)"));
+  check('online picker has a New Student button (inside the picker, before the test list)',
+    stuHtml.indexOf('id="stu-tests"') < stuHtml.indexOf('id="stu-new-student"') &&
+    stuHtml.indexOf('id="stu-new-student"') < stuHtml.indexOf('id="stu-test-list"') &&
+    stuHtml.includes('>← New Student</button>'));
+  check('online New Student button resets to the verify form',
+    stuSrc.includes("$('stu-new-student').addEventListener('click', resetStudent)"));
+  check('online Already Taken screen button reads "New Student — Start Over"',
+    stuSrc.indexOf('function showAlreadyTaken') < stuSrc.indexOf('New Student — Start Over') &&
+    stuSrc.indexOf('New Student — Start Over') < stuSrc.indexOf('function showLockedScreen'));
+  check('lab exam screen has NO reset/back control — only the Submit button',
+    !labExam.includes('stu-new-student') && !labExam.includes('New Student') &&
+    (labExam.match(/<button/g) || []).length === 1 && labExam.includes('id="exam-submit"'));
+  check('online exam screen has NO reset/back control — only the Submit button',
+    !onExam.includes('stu-new-student') && !onExam.includes('New Student') &&
+    (onExam.match(/<button/g) || []).length === 1 && onExam.includes('id="exam-submit"'));
+  const home31 = await req('GET', '/');
+  check('terminal top bar has the three staff login buttons with the right portal links',
+    home31.text.includes('class="staff-logins"') &&
+    home31.text.includes('<a class="staff-btn" href="/teacher">Teacher Login</a>') &&
+    home31.text.includes('<a class="staff-btn" href="/admin">Admin Login</a>') &&
+    home31.text.includes('<a class="staff-btn" href="/principal">Principal Login</a>'));
+  check('terminal staff dropdown is GONE (no menu button, dropdown, or old label)',
+    !home31.text.includes('staff-menu-btn') && !home31.text.includes('staff-dropdown') &&
+    !home31.text.includes('staff-menu-list') && !home31.text.includes('Staff / Faculty Login'));
+  check('student.js has no staff-menu code left (no initStaffMenu, no dropdown wiring)',
+    !stuSrc.includes('initStaffMenu') && !stuSrc.includes('staff-menu-btn') &&
+    !stuSrc.includes('staff-menu-list'));
 
   console.log('\n========================================');
   console.log('E2E RESULT: ' + pass + ' PASS, ' + fail + ' FAIL');

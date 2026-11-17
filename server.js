@@ -52,6 +52,16 @@
 // students missing from the file (not_in_file); Admin removes them in
 // one click via POST /api/students/remove-missing (roster records only —
 // submissions, marks and monthly reports are never touched).
+// v1.13.0: three user-reported fixes, all client-side (no API change):
+// (1) a sticky submit bar — the exam Submit button is always visible at
+// the bottom of the screen (lab + online terminal); it was reported
+// hidden on a real laptop. Old exported lab packs are snapshots — after
+// this update the Admin must export a FRESH lab pack for the fix to
+// reach the laptops. (2) A 'New Student' reset on the test picker (lab +
+// online) and on the online Already Taken screen, so the next student on
+// a shared laptop can start — never during an active exam. (3) The
+// student terminal's single 'Staff / Faculty Login' dropdown is replaced
+// by three clearly labeled buttons: Teacher / Admin / Principal Login.
 
 'use strict';
 
@@ -62,7 +72,7 @@ const crypto = require('crypto');
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = '0.0.0.0';
-const VERSION = '1.12.0';
+const VERSION = '1.13.0';
 const ROOT = __dirname;
 const DATA_DIR = path.join(ROOT, 'data');
 const PUBLIC_DIR = path.join(ROOT, 'public');
@@ -1656,8 +1666,8 @@ function createApp(store) {
       }
       // Portal pages — separate URLs, separate files (no shared navigation).
       // NOTE: '/' IS the Student Terminal (same file as /student) — students
-      // see only the roll-number terminal; staff portals live behind the
-      // "Staff / Faculty Login" menu on that page.
+      // see only the roll-number terminal; staff portals have three clearly
+      // labeled login buttons (Teacher / Admin / Principal) on that page.
       const PORTAL_PAGES = {
         '/': 'student.html',
         '/student': 'student.html',

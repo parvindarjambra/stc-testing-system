@@ -9,8 +9,9 @@
 </head>
 <!-- Student Terminal: this IS the home page (served at both / and /student).
      Students see ONLY the four-field verification terminal here — staff
-     portals live behind the single discreet "Staff / Faculty Login" menu,
-     top-right. -->
+     reach their portals from the three clearly labeled login buttons
+     (Teacher / Admin / Principal) at the top-right (v1.13.0: the old
+     single staff-login dropdown was replaced). -->
 <body class="terminal-mode">
 
 <header class="site-header site-header-compact terminal-header">
@@ -25,13 +26,14 @@
     <div class="terminal-header-right">
       <span id="queue-badge" class="queue-badge hidden" title="Submissions waiting to sync"></span>
       <button id="btn-sync-now" class="btn btn-small hidden" type="button">Sync now</button>
-      <div class="staff-menu">
-        <button id="staff-menu-btn" class="staff-btn" type="button" aria-haspopup="true" aria-expanded="false">Staff / Faculty Login</button>
-        <div id="staff-menu-list" class="staff-dropdown hidden" role="menu">
-          <a href="/teacher" role="menuitem">Teacher</a>
-          <a href="/admin" role="menuitem">Admin / Exam Controller</a>
-          <a href="/principal" role="menuitem">Principal</a>
-        </div>
+      <!-- v1.13.0: three clearly labeled staff login buttons (the old
+           single staff-login dropdown hid the portals — the Admin
+           laptop's home page must make them obvious). Plain links,
+           no JavaScript. -->
+      <div class="staff-logins">
+        <a class="staff-btn" href="/teacher">Teacher Login</a>
+        <a class="staff-btn" href="/admin">Admin Login</a>
+        <a class="staff-btn" href="/principal">Principal Login</a>
       </div>
     </div>
   </div>
@@ -79,6 +81,14 @@
     <div id="stu-tests" class="card hidden">
       <h2>Select Your Test</h2>
       <p id="stu-tests-who" class="muted"></p>
+      <!-- v1.13.0: next-student reset — after 'You have already taken this
+           test.' the student was stranded on the picker with no way for the
+           NEXT student to start (shared laptops). This button clears the
+           verified session and returns to the verify form. It exists ONLY
+           on the picker — NEVER during an active exam. -->
+      <div class="btn-row">
+        <button class="btn" type="button" id="stu-new-student">← New Student</button>
+      </div>
       <div id="stu-test-list" class="card-grid"></div>
     </div>
 
@@ -91,9 +101,15 @@
       <p id="exam-meta" class="muted"></p>
       <div id="exam-palette" class="palette"></div>
       <div id="exam-questions"></div>
-      <div class="exam-actions">
-        <button class="btn btn-primary btn-big" type="button" id="exam-submit">Submit Exam</button>
-        <p class="muted">Your exam submits automatically when time runs out.</p>
+      <!-- v1.13.0: sticky submit bar — the Submit button is always visible
+           at the bottom of the screen during the exam (the old in-flow
+           button below the last question was reported hidden on a real
+           laptop). No back/reset control here by design: never mid-exam. -->
+      <div class="exam-sticky-bar">
+        <div class="exam-sticky-inner">
+          <button class="btn btn-primary btn-big" type="button" id="exam-submit">Submit Exam</button>
+          <span class="muted">Your exam submits automatically when time runs out.</span>
+        </div>
       </div>
     </div>
 
