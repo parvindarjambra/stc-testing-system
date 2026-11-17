@@ -607,8 +607,9 @@ function importTeachersCsv() {
 /* Lab Pack download: the server embeds students + tests (no answer keys)
    into the standalone lab app and serves it as STC-Lab.html.
    v1.10.2: a teacher PIN is required — the server embeds only its SHA-256
-   hash, and the lab app asks for the PIN before Export (Teacher) /
-   Clear saved, so students on the laptop cannot use those buttons. */
+   hash, and the lab app asks for the PIN before Export (Teacher)
+   (v1.11.1: Export is the only PIN-gated action — Clear saved was
+   removed), so students on the laptop cannot use that button. */
 function downloadLabPack() {
   const pin = ($('lab-pin').value || '').trim();
   if (!/^\d{4,}$/.test(pin)) {

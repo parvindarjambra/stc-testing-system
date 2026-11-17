@@ -36,14 +36,17 @@
 // v1.10.2: lab teacher PIN — Admin sets a PIN when exporting a lab pack
 // (GET /api/lab-pack?pin=...); the server embeds only its SHA-256 hash
 // (never the plain PIN) and the lab app asks for the PIN before Export
-// (Teacher) or Clear saved. Packs without a hash (pre-v1.10.2) still
-// work without a PIN.
+// (Teacher) (Clear saved was removed in v1.11.1). Packs without a hash
+// (pre-v1.10.2) still work without a PIN.
 // v1.11.0: course-wise student feedback — after grading, Admin generates
 // a per-student proof sheet (GET /api/feedback, Admin only) for one test
 // or one month: every MCQ with right/wrong + correct answer, blanks with
 // the correct answer, theory with the student's written answer + the
 // teacher's marks, and totals. ROLL NUMBERS ONLY — the endpoint never
 // returns student names. Only FINALIZED (status 'final') results appear.
+// v1.11.1: the lab 'Clear saved' button was REMOVED — lab data is never
+// deletable (no backup exists; a delete after a failed import would lose
+// students' answers forever). The teacher PIN now guards Export only.
 
 'use strict';
 
@@ -54,7 +57,7 @@ const crypto = require('crypto');
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = '0.0.0.0';
-const VERSION = '1.11.0';
+const VERSION = '1.11.1';
 const ROOT = __dirname;
 const DATA_DIR = path.join(ROOT, 'data');
 const PUBLIC_DIR = path.join(ROOT, 'public');
@@ -963,9 +966,10 @@ function createApp(store) {
     // lab laptops open with a double-click. Admin only: the pack holds the
     // student list.
     // v1.10.2: a teacher PIN is required (?pin=...): the lab app asks for
-    // it before Export (Teacher) / Clear saved, so students on the laptop
-    // cannot download or delete submissions. Only the SHA-256 hash of the
-    // PIN is embedded in the pack — the plain PIN never leaves this request.
+    // it before Export (Teacher) (v1.11.1: Export is the only PIN-gated
+    // action — Clear saved was removed), so students on the laptop cannot
+    // download submissions. Only the SHA-256 hash of the PIN is embedded
+    // in the pack — the plain PIN never leaves this request.
     if (method === 'GET' && pathname === '/api/lab-pack') {
       if (!requireAuth(req, res, ['admin'])) return;
       const pin = typeof query.pin === 'string' ? query.pin.trim() : '';

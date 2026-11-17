@@ -891,6 +891,59 @@ Screenshots: v1100-already-taken.png, v1100-draft-restored.png in the
 project folder (not shipped in the ZIP).
 Version bumped to 1.10.0.
 
+## v1.11.1 (2026-11-16) — Lab data is never deletable (Clear saved removed)
+
+User order (20:13 PST): "data delete nahi honi chahiye, backup nahi
+hai" — if the USB import glitches and someone then presses Clear saved
+on a lab laptop, the students' answers are gone forever with no backup
+and nobody on site to help. So the lab app now has NO way to delete
+saved submissions at all.
+
+What changed: the 'Clear saved' button is REMOVED from lab-template.html
+entirely — the button, its PIN gate, its confirm dialog, and the
+clearSaved() function (with its localStorage.removeItem call). The lab
+template now contains NO localStorage.removeItem / localStorage.clear
+anywhere: saved submissions are only ever read (getItem) and written
+(setItem). The draft-clear-on-submit is KEPT — it is safe because the
+submission is already saved at that point (it only drops the in-progress
+draft, never a saved submission). Export (Teacher) stays exactly as in
+v1.10.2 — PIN-gated on every click, still downloads ALL saved
+submissions (re-exporting old data is harmless: the Admin import
+dedupes by client_id). The teacher PIN now guards Export ONLY: the
+Admin USB Lab Sync hint reads "Teachers need this PIN to Export on lab
+laptops. Tell it to the teacher — students must not know it.", and the
+lab PIN modal wording mentions only the Export download. Old packs
+(without a hash) still work without a PIN — and also have no Clear
+button once the template is updated.
+
+Honest limit: submissions now accumulate in each laptop's local
+storage — roughly 40–50 KB per laptop per day, so this is safe for many
+months, and the Admin PC holds the main copy of everything imported.
+If a laptop's storage ever runs low, the Admin must be told — do NOT
+fix it by adding a delete button back.
+
+Tests: E2E 342 PASS, 0 FAIL (was 334; +8 in new §29 — no btn-clear,
+no clearSaved, no removeItem/clear on storage, get/set only,
+draft-clear-on-submit kept, Export still PIN-gated, PIN modal wording
+Export-only, Admin hint Export-only, export envelope version 1.11.1;
+the §27 PIN-gate check now asserts Export-only). e2e-sync-test.js 62
+PASS, 0 FAIL (unchanged — the lab loop is untouched). Headless-Chromium
+check (CDP, real server, 0 JS errors, 29/29 checks): Admin PIN field +
+Export-only hint + inline errors + pack download (hash in, plain PIN
+out); lab topbar has Export and NO Clear button; Export PIN flow (wrong
+denied, Cancel closes, correct downloads the saved submission, PIN
+asked again on the next Export); the saved submission survives a real
+browser close + reopen (still no Clear button); old pack (hash
+stripped) exports directly with no PIN prompt and no Clear button. Lab
+smoke of the real exported STC-Lab.html (file://, 0 JS errors, 13/13
+checks — was 12, +1 no-Clear check): zero external refs, no answer
+keys, PIN hash in / plain PIN out, no Clear button, wrong roll locks,
+submit saves, result screen shows no scores, Export PIN flow, exported
+JSON imports cleanly (FIB auto-graded, theory routed to teacher).
+Screenshots: v1111-topbar-no-clear.png, v1111-export-pin.png in the
+project folder (not shipped in the ZIP).
+Version bumped to 1.11.1.
+
 ## v1.11.0 (2026-11-16) — Course-wise student feedback PDF (roll numbers only)
 
 User order (09:28 PST, spec refined 19:47 PST): after grading, students

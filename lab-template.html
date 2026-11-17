@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- =====================================================================
-     STC Testing System — Offline Lab App (USB sync, v1.11.0).
+     STC Testing System — Offline Lab App (USB sync, v1.11.1).
      Super Sys-Tech Computers Centre, Umerkot.
 
      SELF-CONTAINED: inline CSS + inline JS, ZERO external references,
@@ -21,6 +21,10 @@
      submissions are checked before an exam starts); in-progress answers
      are auto-saved as a draft, so a closed file or a crash mid-test
      restores the same student's exam on reopen.
+     v1.11.1: NO delete path — the 'Clear saved' button was removed, so
+     saved submissions can never be deleted from this laptop (no backup
+     exists). The laptop keeps every submission; the Admin PC holds the
+     main copy after import.
      ===================================================================== -->
 <html lang="en">
 <head>
@@ -94,7 +98,7 @@ th { color: #475569; font-weight: 600; width: 38%; }
 .modal-card { background: #fff; border-radius: 16px; padding: 28px; max-width: 480px; width: 100%; text-align: center; box-shadow: 0 10px 30px rgba(15, 23, 42, 0.3); }
 .modal-card h3 { margin: 0 0 10px; color: #991B1B; font-size: 21px; }
 .modal-card p { margin: 0 0 20px; color: #1e293b; font-size: 16px; line-height: 1.5; }
-/* Teacher PIN modal (v1.10.2): Export / Clear ask for the PIN first. */
+/* Teacher PIN modal (v1.10.2; Export only since v1.11.1 — Clear saved was removed): Export asks for the PIN first. */
 .modal-card h3.pin-title { color: #0f172a; }
 #pin-input { width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 20px; font-family: inherit; text-align: center; letter-spacing: 6px; }
 #pin-input:focus { outline: 2px solid #2dd4bf; border-color: #2dd4bf; }
@@ -122,7 +126,11 @@ th { color: #475569; font-weight: 600; width: 38%; }
   <span class="offline-pill">Offline — no internet needed</span>
   <span id="saved-badge" class="saved-badge hidden"></span>
   <button id="btn-export" class="btn btn-small" type="button" title="Teacher: download this laptop's saved submissions as a JSON file for the USB stick">Export (Teacher)</button>
-  <button id="btn-clear" class="btn btn-small btn-danger" type="button" title="Teacher only: delete the saved submissions on this laptop AFTER Admin has confirmed the import">Clear saved</button>
+  <!-- v1.11.1: NO Clear/delete button by design — lab data is never
+       deletable (there is no backup; a delete after a failed import
+       would lose students' answers forever). The laptop keeps every
+       submission as its own backup; the Admin PC holds the main copy
+       after import. Exporting again is safe — the import dedupes. -->
 </nav>
 
 <div id="toast" class="toast hidden" role="alert"></div>
@@ -213,11 +221,12 @@ th { color: #475569; font-weight: 600; width: 38%; }
   </div>
 </div>
 
-<!-- Teacher PIN (v1.10.2): Export (Teacher) / Clear saved ask for the PIN
-     first — students get no permissions beyond taking their own test.
-     The PIN is checked against the pack's SHA-256 hash on EVERY click
-     (nothing is remembered, so the next student inherits no access).
-     Packs exported before v1.10.2 have no hash — they work without a PIN. -->
+<!-- Teacher PIN (v1.10.2; Export only since v1.11.1): Export (Teacher)
+     asks for the PIN first — students get no permissions beyond taking
+     their own test. The PIN is checked against the pack's SHA-256 hash
+     on EVERY click (nothing is remembered, so the next student inherits
+     no access). Packs exported before v1.10.2 have no hash — they work
+     without a PIN. -->
 <div id="pin-modal" class="modal-overlay hidden" role="alertdialog" aria-modal="true" aria-labelledby="pin-modal-title">
   <div class="modal-card">
     <h3 id="pin-modal-title" class="pin-title">🔒 Teacher PIN</h3>
@@ -374,7 +383,6 @@ function initLab() {
   if (!LAB_PACK || !Array.isArray(LAB_PACK.students) || !Array.isArray(LAB_PACK.tests)) {
     $('lab-nopack').classList.remove('hidden');
     $('btn-export').disabled = true;
-    $('btn-clear').disabled = true;
     return;
   }
   $('stu-start').classList.remove('hidden');
@@ -422,9 +430,9 @@ function initLab() {
   $('exam-submit').addEventListener('click', function () { submitExam(false); });
   $('ac-continue').addEventListener('click', hideAcWarning);
   $('stu-result-done').addEventListener('click', resetStudent);
-  /* v1.10.2: Export / Clear ask for the teacher PIN first. */
-  $('btn-export').addEventListener('click', function () { requirePin('export'); });
-  $('btn-clear').addEventListener('click', function () { requirePin('clear'); });
+  /* v1.10.2: Export asks for the teacher PIN first (v1.11.1: Export is
+     the only PIN-gated action — Clear saved was removed). */
+  $('btn-export').addEventListener('click', function () { requirePin(); });
   $('pin-ok').addEventListener('click', submitPin);
   $('pin-cancel').addEventListener('click', cancelPin);
   $('pin-input').addEventListener('keydown', function (ev) {
@@ -789,10 +797,10 @@ function resetStudent() {
   window.scrollTo(0, 0);
 }
 
-/* ---------------- Teacher PIN (v1.10.2) ---------------- */
-/* Export (Teacher) / Clear saved ask for the teacher PIN first — students
-   get no permissions beyond taking their own test. The pack stores only
-   the SHA-256 hash of the PIN; the entered PIN is hashed here and compared
+/* ---------------- Teacher PIN (v1.10.2; Export only since v1.11.1) ---------------- */
+/* Export (Teacher) asks for the teacher PIN first — students get no
+   permissions beyond taking their own test. The pack stores only the
+   SHA-256 hash of the PIN; the entered PIN is hashed here and compared
    with it. The PIN is checked on EVERY click — nothing is remembered, so
    the next student at the laptop inherits no access. Packs exported
    before v1.10.2 have no hash and work without a PIN. */
@@ -862,24 +870,16 @@ function sha256Hex(ascii) {
   return result;
 }
 
-var pinAction = null; /* 'export' | 'clear' — the action waiting on the PIN */
-function runPinAction() {
-  var action = pinAction;
-  pinAction = null;
-  if (action === 'export') exportSubmissions();
-  else if (action === 'clear') clearSaved();
-}
-function requirePin(action) {
+/* v1.11.1: the PIN guards Export only — 'Clear saved' was removed, so
+   there is no delete path at all in the lab app (no backup exists: a
+   delete after a failed import would lose students' answers forever). */
+function requirePin() {
   /* Old packs (no hash) work without a PIN. */
   if (!LAB_PACK || !LAB_PACK.pin_hash) {
-    if (action === 'export') exportSubmissions();
-    else clearSaved();
+    exportSubmissions();
     return;
   }
-  pinAction = action;
-  $('pin-modal-text').textContent = action === 'export'
-    ? 'Enter the teacher PIN to download the saved submissions.'
-    : 'Enter the teacher PIN to clear the saved submissions.';
+  $('pin-modal-text').textContent = 'Enter the teacher PIN to download the saved submissions.';
   $('pin-error').classList.add('hidden');
   $('pin-input').value = '';
   $('pin-modal').classList.remove('hidden');
@@ -890,7 +890,7 @@ function submitPin() {
   if (LAB_PACK && LAB_PACK.pin_hash && sha256Hex(entered) === LAB_PACK.pin_hash) {
     $('pin-modal').classList.add('hidden');
     $('pin-input').value = '';
-    runPinAction();
+    exportSubmissions();
   } else {
     $('pin-error').classList.remove('hidden');
     $('pin-input').value = '';
@@ -898,7 +898,6 @@ function submitPin() {
   }
 }
 function cancelPin() {
-  pinAction = null;
   $('pin-modal').classList.add('hidden');
   $('pin-input').value = '';
 }
@@ -913,7 +912,7 @@ function exportSubmissions() {
     '-' + pad(now.getHours()) + pad(now.getMinutes());
   var envelope = {
     format: 'stc-lab-submissions',
-    version: '1.11.0',
+    version: '1.11.1',
     pack_id: (LAB_PACK && LAB_PACK.pack_id) || null,
     exported_at: now.toISOString(),
     submissions: saved
@@ -928,15 +927,6 @@ function exportSubmissions() {
   a.remove();
   setTimeout(function () { URL.revokeObjectURL(url); }, 5000);
   toast(saved.length + ' submission' + (saved.length === 1 ? '' : 's') + ' downloaded. Save the file to the USB stick.', true);
-}
-
-function clearSaved() {
-  var saved = getSaved();
-  if (!saved.length) { toast('Nothing saved on this laptop.', false); return; }
-  if (!confirm('TEACHER ONLY: delete the ' + saved.length + ' saved submission(s) on this laptop?\n\nOnly do this AFTER Admin has confirmed the USB import worked. Deleted submissions cannot be recovered.')) return;
-  localStorage.removeItem(SUBS_KEY);
-  updateSavedBadge();
-  toast('Saved submissions cleared from this laptop.', true);
 }
 
 document.addEventListener('DOMContentLoaded', initLab);

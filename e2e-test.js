@@ -1,8 +1,9 @@
-// STC Testing System — end-to-end verification script (v1.11.0: course-wise
-// student feedback PDF — roll numbers only, finalized results only;
+// STC Testing System — end-to-end verification script (v1.11.1: lab
+// 'Clear saved' REMOVED — lab data is never deletable (no backup), the
+// teacher PIN guards Export only; v1.11.0: course-wise student feedback
+// PDF — roll numbers only, finalized results only;
 // v1.10.2: lab teacher PIN — pack export requires a PIN, only its
-// SHA-256 hash is embedded, the lab app asks for the PIN before Export /
-// Clear saved;
+// SHA-256 hash is embedded, the lab app asks for the PIN before Export;
 // v1.10.1: three anti-cheat warnings before auto-lock (lock on the 4th
 // switch); theory marking back to the teacher — MCQ + FIB auto-graded,
 // theory ALWAYS teacher-graded (stored key words ignored); v1.10.0: one
@@ -82,7 +83,7 @@ async function main() {
   const h = await req('GET', '/api/health');
   check('health 200 + ok', h.status === 200 && h.json && h.json.ok === true, JSON.stringify(h.json));
   check('db backend reported', h.json && (h.json.db === 'sqlite' || h.json.db === 'json'), h.json && h.json.db);
-  check('version is 1.11.0', h.json && h.json.version === '1.11.0', h.json && h.json.version);
+  check('version is 1.11.1', h.json && h.json.version === '1.11.1', h.json && h.json.version);
   const home = await req('GET', '/');
   check('home is the Student Terminal (institute name + verify form + heading)',
     home.status === 200 && home.text.includes('Super Sys-Tech Computers Centre') &&
@@ -1127,9 +1128,9 @@ async function main() {
   check('lab app has a SHA-256 + PIN modal + Wrong PIN message',
     labSrc.includes('function sha256Hex') && labSrc.includes('id="pin-modal"') &&
     labSrc.includes('Wrong PIN.'));
-  check('lab app gates Export + Clear on the PIN, checked every click',
-    labSrc.includes("requirePin('export')") && labSrc.includes("requirePin('clear')") &&
-    labSrc.includes('sha256Hex(entered) === LAB_PACK.pin_hash'));
+  check('lab app gates Export on the PIN, checked every click (v1.11.1: Export only)',
+    labSrc.includes('requirePin()') && labSrc.includes('sha256Hex(entered) === LAB_PACK.pin_hash') &&
+    !labSrc.includes("requirePin('clear')"));
   check('lab app works without a PIN when the pack has no hash (old packs)',
     labSrc.includes('!LAB_PACK.pin_hash'));
 
@@ -1237,6 +1238,31 @@ async function main() {
   check('print CSS: one student per page + questions never split (page-break rules)',
     css.text.includes('.fb-student') && css.text.includes('page-break-before: always') &&
     css.text.includes('.fb-q') && css.text.includes('page-break-inside: avoid'));
+
+  console.log('\n[29] v1.11.1 — lab data is never deletable: Clear saved removed, PIN is Export-only');
+  // The user's order: no backup exists, so a delete after a failed import
+  // would lose students' answers forever. The lab app must have NO way to
+  // delete saved submissions.
+  check('lab app has NO Clear saved button (no btn-clear anywhere)',
+    !labSrc.includes('btn-clear'));
+  check('lab app has NO clearSaved function and no removeItem/clear on storage',
+    !labSrc.includes('clearSaved') && !labSrc.includes('localStorage.removeItem') &&
+    !labSrc.includes('localStorage.clear'));
+  check('lab app only reads/writes saved submissions — never deletes them',
+    labSrc.includes('localStorage.getItem(SUBS_KEY)') && labSrc.includes('localStorage.setItem(SUBS_KEY'));
+  check('lab draft-clear-on-submit is KEPT (safe: the submission is already saved)',
+    labSrc.includes('clearDraft(S.student.roll_number, S.test.id)'));
+  check('lab Export button still present + still PIN-gated',
+    labSrc.includes('id="btn-export"') && labSrc.includes('requirePin()') &&
+    labSrc.includes('id="pin-modal"') && labSrc.includes('Wrong PIN.'));
+  check('lab PIN modal wording mentions only the Export download',
+    labSrc.includes('Enter the teacher PIN to download the saved submissions.') &&
+    !labSrc.includes('to clear the saved submissions'));
+  check('admin hint text: PIN is for Export only now',
+    admFrag.includes('Teachers need this PIN to Export on lab laptops') &&
+    !admFrag.includes('to Export or Clear'));
+  check('lab export envelope version is 1.11.1',
+    labSrc.includes("version: '1.11.1'"));
 
   console.log('\n========================================');
   console.log('E2E RESULT: ' + pass + ' PASS, ' + fail + ' FAIL');
