@@ -891,6 +891,67 @@ Screenshots: v1100-already-taken.png, v1100-draft-restored.png in the
 project folder (not shipped in the ZIP).
 Version bumped to 1.10.0.
 
+## v1.13.1 (2026-11-16) — Admin PC opens staff login, not the student form
+
+The user asked twice why the Admin PC's home page shows the student
+'Candidate Identity Verification' form ('admin ki PC mein is ka kya
+kaam hai — admin thori test dega'). He is right: on the Admin PC
+itself the student form is pointless — the Admin uses the staff
+logins. The student form exists for Wi-Fi laptops (students taking
+tests online via the Admin PC's address).
+
+What changed: `/` is now ORIGIN-AWARE (server.js). If the request
+comes from localhost — `remoteAddress` 127.0.0.1 or ::1 (plus the
+dual-stack mapped form ::ffff:127.0.0.1) — the server serves a new
+STAFF LANDING (`public/staff-landing.html`): the same top bar + a
+clean card with three big buttons — Teacher Login, Admin Login,
+Principal Login — linking to /teacher, /admin, /principal. No student
+form on this page (no form of any kind, no verify fields); a small
+'Open the Student Terminal' link sits below the buttons. From any
+other (LAN) address, `/` serves the Student Terminal exactly as
+before (with the three staff login buttons in the top bar, v1.13.0).
+`/student` ALWAYS serves the terminal regardless of origin, so the
+Admin can still open it on his own PC to check/demo the student
+flow. Only the socket's remote address is trusted — NEVER an
+X-Forwarded-For header (this is a LAN server; headers can be spoofed
+by any client). The origin check is a pure exported function
+(`isLocalhostAddress`, also handling the mapped loopback form) so the
+E2E suite can unit-test the LAN branch it cannot fake over HTTP. No
+other functional changes: the lab app is untouched, /teacher, /admin
+and /principal are untouched. Small polish: links inside the dark
+terminal card are emerald now (style.css), not the browser-default
+blue — the staff landing's 'Open the Student Terminal' link was
+showing blue on the dark card. `public/index.html`'s fallback link
+now reads 'Open STC Testing System' (it redirects to `/`, which is
+origin-aware now).
+
+Tests: E2E 384 PASS, 0 FAIL (was 376; +3 in §1 — home on localhost
+is the staff landing, landing has no form, /student is the terminal;
++5 in new §32 — unit-level origin checks for loopback / LAN /
+non-address values, staff landing file serves directly, a spoofed
+X-Forwarded-For header is ignored; the §1 terminal checks and the
+§31 top-bar checks now fetch /student, which always serves the
+terminal). The LAN branch is covered by the unit checks: a live fetch
+via the machine's LAN IPv4 is attempted but sandboxed runtimes block
+direct TCP to non-loopback addresses, so the suite skips it with a
+note instead of crashing. e2e-sync-test.js 62 PASS, 0 FAIL
+(unchanged — the lab loop is untouched). Headless-Chromium check
+(CDP, real server, 0 JS errors, 10/10 checks): localhost / shows the
+staff landing card with three big visible buttons (right labels +
+links, no form, no verify fields or heading); each button navigates
+to its portal login page; localhost /student shows the verify form
+(all four fields + heading, no staff landing) with the three staff
+login buttons in the top bar. Lab smoke of the real exported
+STC-Lab.html (file://, 0 JS errors, 17/17 checks, regression only):
+zero external refs, no answer keys, PIN hash in / plain PIN out,
+sticky submit bar + picker New Student button in the pack, no Clear
+button, wrong roll locks, submit saves, result screen shows no
+scores, Export PIN flow, exported JSON imports cleanly (FIB
+auto-graded, theory routed to teacher).
+Screenshots: v1131-staff-landing.png, v1131-student-terminal.png in
+the project folder (not shipped in the ZIP).
+Version bumped to 1.13.1.
+
 ## v1.13.0 (2026-11-16) — Sticky submit bar, next-student reset, prominent staff logins
 
 Three user-reported fixes from his own screenshots on his PC (20:35 PST).

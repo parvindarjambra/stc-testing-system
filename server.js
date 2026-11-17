@@ -62,6 +62,13 @@
 // a shared laptop can start — never during an active exam. (3) The
 // student terminal's single 'Staff / Faculty Login' dropdown is replaced
 // by three clearly labeled buttons: Teacher / Admin / Principal Login.
+// v1.13.1: '/' is ORIGIN-AWARE. On the Admin PC itself (localhost) it
+// serves a STAFF LANDING (public/staff-landing.html — three big login
+// buttons, no student form: the Admin never takes a test). From any other
+// (LAN) address it serves the Student Terminal as before. '/student'
+// ALWAYS serves the terminal, so the Admin can still check/demo the
+// student flow on his own PC. Only the socket's remote address is
+// trusted — never an X-Forwarded-For header (spoofable on a LAN).
 
 'use strict';
 
@@ -72,11 +79,25 @@ const crypto = require('crypto');
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = '0.0.0.0';
-const VERSION = '1.13.0';
+const VERSION = '1.13.1';
 const ROOT = __dirname;
 const DATA_DIR = path.join(ROOT, 'data');
 const PUBLIC_DIR = path.join(ROOT, 'public');
 const MAX_BODY = 5 * 1024 * 1024; // 5 MB (CSV imports)
+
+// v1.13.1: is this request from the Admin PC itself (localhost)? Only the
+// socket's remote address is trusted — NEVER an X-Forwarded-For header
+// (this is a LAN server; any client can send any header). Node reports
+// IPv6 localhost as ::1; on dual-stack sockets IPv4 localhost can arrive
+// mapped as ::ffff:127.0.0.1 — all three are loopback. Exported for the
+// E2E suite's unit-level check of the LAN branch (the suite cannot fake
+// a remote address over HTTP).
+function isLocalhostAddress(addr) {
+  return addr === '127.0.0.1' || addr === '::1' || addr === '::ffff:127.0.0.1';
+}
+function isLocalhostRequest(req) {
+  return isLocalhostAddress(req.socket && req.socket.remoteAddress);
+}
 
 const COLLECTIONS = ['users', 'students', 'courses', 'tests', 'submissions', 'consolidations'];
 
@@ -1665,11 +1686,16 @@ function createApp(store) {
         return;
       }
       // Portal pages — separate URLs, separate files (no shared navigation).
-      // NOTE: '/' IS the Student Terminal (same file as /student) — students
-      // see only the roll-number terminal; staff portals have three clearly
-      // labeled login buttons (Teacher / Admin / Principal) on that page.
+      // v1.13.1: '/' is ORIGIN-AWARE. On the Admin PC itself (localhost)
+      // it serves the STAFF LANDING (three big login buttons, no student
+      // form — the Admin never takes a test). From any other (LAN) address
+      // it serves the Student Terminal as before. '/student' ALWAYS serves
+      // the terminal, so the Admin can still check/demo the student flow.
+      if (pathname === '/') {
+        return serveFile(res, path.join(PUBLIC_DIR,
+          isLocalhostRequest(req) ? 'staff-landing.html' : 'student.html'));
+      }
       const PORTAL_PAGES = {
-        '/': 'student.html',
         '/student': 'student.html',
         '/teacher': 'teacher.html',
         '/admin': 'admin.html',
@@ -1718,6 +1744,7 @@ function createApp(store) {
 }
 
 module.exports.createApp = createApp;
+module.exports.isLocalhostAddress = isLocalhostAddress;
 
 // ---------------------------------------------------------------------------
 // Startup (only when run directly: `node server.js`)

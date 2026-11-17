@@ -632,6 +632,9 @@ body.terminal-mode main { flex: 1; width: 100%; }
 }
 .terminal-card h2 { color: #fff; font-size: 26px; font-weight: 800; margin: 0 0 8px; letter-spacing: -0.02em; }
 .terminal-card .muted { color: #b8c4d8; margin-top: 0; }
+/* v1.13.1: links inside the dark card (staff landing's 'Open the Student
+   Terminal' link) — emerald, not the browser-default blue. */
+.terminal-card a:not(.btn) { color: #6ee7b7; }
 .terminal-card form { text-align: left; margin-top: 20px; }
 .terminal-card label { color: #e2e8f0; }
 .terminal-card input[type="text"] {

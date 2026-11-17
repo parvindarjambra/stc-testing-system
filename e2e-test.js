@@ -1,4 +1,8 @@
-// STC Testing System — end-to-end verification script (v1.13.0: sticky
+// STC Testing System — end-to-end verification script (v1.13.1: '/' is
+// origin-aware — localhost opens the staff landing (three big login
+// buttons, no student form), LAN opens the Student Terminal; /student
+// always serves the terminal; only the socket's remote address is
+// trusted, never X-Forwarded-For; v1.13.0: sticky
 // submit bar (lab + online terminal) — the Submit button is always
 // visible at the bottom of the screen during an exam; 'New Student'
 // reset on the test picker (lab + online) and the online Already Taken
@@ -47,6 +51,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const os = require('os');
 
 const BASE = process.argv[2] || 'http://127.0.0.1:3102';
 let pass = 0, fail = 0;
@@ -92,23 +97,37 @@ async function main() {
   const h = await req('GET', '/api/health');
   check('health 200 + ok', h.status === 200 && h.json && h.json.ok === true, JSON.stringify(h.json));
   check('db backend reported', h.json && (h.json.db === 'sqlite' || h.json.db === 'json'), h.json && h.json.db);
-  check('version is 1.13.0', h.json && h.json.version === '1.13.0', h.json && h.json.version);
+  check('version is 1.13.1', h.json && h.json.version === '1.13.1', h.json && h.json.version);
+  // v1.13.1: '/' is origin-aware — this suite runs from 127.0.0.1, so home
+  // is the STAFF LANDING (three big login buttons, no student form). The
+  // terminal itself is checked via /student, which always serves it.
   const home = await req('GET', '/');
-  check('home is the Student Terminal (institute name + verify form + heading)',
+  check('home on localhost is the Staff Landing (institute name + three login buttons, NO verify form)',
     home.status === 200 && home.text.includes('Super Sys-Tech Computers Centre') &&
-    home.text.includes('stu-verify-form') && home.text.includes('Candidate Identity Verification'));
-  check('terminal has three staff login buttons (Teacher / Admin / Principal), no dropdown',
+    home.text.includes('id="staff-landing"') && home.text.includes('Staff Login') &&
     home.text.includes('Teacher Login') && home.text.includes('Admin Login') && home.text.includes('Principal Login') &&
     ['/teacher', '/admin', '/principal'].every((p) => home.text.includes('href="' + p + '"')) &&
-    !home.text.includes('Staff / Faculty Login') && !home.text.includes('staff-dropdown') &&
-    !home.text.includes('staff-menu-btn'));
-  check('terminal has NO portal cards',
-    !home.text.includes('portal-card') && !home.text.includes('Choose your portal'));
-  check('terminal has NO portal console content',
-    !home.text.includes('teacher-queue') && !home.text.includes('tab-dashboard') && !home.text.includes('pa-totals'));
+    !home.text.includes('stu-verify-form') && !home.text.includes('Candidate Identity Verification'));
+  check('staff landing has NO form of any kind (no verify fields, no login form)',
+    !home.text.includes('<form') && !home.text.includes('stu-name') && !home.text.includes('login-form'));
   const stuPage = await req('GET', '/student');
   check('student page serves (verify form, no login form)',
     stuPage.status === 200 && stuPage.text.includes('stu-verify-form') && !stuPage.text.includes('login-form'));
+  check('/student is the Student Terminal (institute name + verify heading)',
+    stuPage.text.includes('Super Sys-Tech Computers Centre') &&
+    stuPage.text.includes('Candidate Identity Verification'));
+  check('terminal has three staff login buttons (Teacher / Admin / Principal), no dropdown',
+    stuPage.text.includes('Teacher Login') && stuPage.text.includes('Admin Login') && stuPage.text.includes('Principal Login') &&
+    ['/teacher', '/admin', '/principal'].every((p) => stuPage.text.includes('href="' + p + '"')) &&
+    !stuPage.text.includes('Staff / Faculty Login') && !stuPage.text.includes('staff-dropdown') &&
+    !stuPage.text.includes('staff-menu-btn'));
+  check('terminal has NO portal cards',
+    !stuPage.text.includes('portal-card') && !stuPage.text.includes('Choose your portal'));
+  check('terminal has NO portal console content',
+    !stuPage.text.includes('teacher-queue') && !stuPage.text.includes('tab-dashboard') && !stuPage.text.includes('pa-totals'));
+  check('staff landing has NO portal cards or console content either',
+    !home.text.includes('portal-card') && !home.text.includes('Choose your portal') &&
+    !home.text.includes('teacher-queue') && !home.text.includes('tab-dashboard') && !home.text.includes('pa-totals'));
   const teaPage = await req('GET', '/teacher');
   check('teacher page serves login form only',
     teaPage.status === 200 && teaPage.text.includes('id="login-form"') && teaPage.text.includes('Teacher Login'));
@@ -124,7 +143,7 @@ async function main() {
       !t.includes('principal123') && !t.includes('Demo:')));
   check('portal pages are distinct',
     stuPage.text !== teaPage.text && teaPage.text !== admPage.text && admPage.text !== priPage.text);
-  check('home (/) and /student serve the same terminal page', home.text === stuPage.text);
+  check('home (/) on localhost differs from /student (staff landing vs terminal)', home.text !== stuPage.text);
   for (const f of ['common.js', 'student.js', 'teacher.js', 'admin.js', 'principal.js']) {
     const r = await req('GET', '/' + f);
     check(f + ' serves', r.status === 200 && r.text.length > 500, f + ': ' + r.status);
@@ -136,7 +155,7 @@ async function main() {
   const tpl = await req('GET', '/students_template.csv');
   check('students_template.csv serves', tpl.status === 200 && tpl.text.includes('Roll Number'));
   const idx = await req('GET', '/index.html');
-  check('/index.html redirects to the terminal (no old landing)',
+  check('/index.html redirects home (no old landing)',
     idx.status === 200 && idx.text.includes('url=/') && !idx.text.includes('portal-card'));
   const unknown = await req('GET', '/no-such-page');
   check('unknown path -> 404 (no SPA fallback)', unknown.status === 404);
@@ -1415,18 +1434,70 @@ async function main() {
   check('online exam screen has NO reset/back control — only the Submit button',
     !onExam.includes('stu-new-student') && !onExam.includes('New Student') &&
     (onExam.match(/<button/g) || []).length === 1 && onExam.includes('id="exam-submit"'));
-  const home31 = await req('GET', '/');
+  // v1.13.1: '/' on localhost is the staff landing now, so the terminal's
+  // top bar is checked via /student (which always serves the terminal).
+  const term31 = await req('GET', '/student');
   check('terminal top bar has the three staff login buttons with the right portal links',
-    home31.text.includes('class="staff-logins"') &&
-    home31.text.includes('<a class="staff-btn" href="/teacher">Teacher Login</a>') &&
-    home31.text.includes('<a class="staff-btn" href="/admin">Admin Login</a>') &&
-    home31.text.includes('<a class="staff-btn" href="/principal">Principal Login</a>'));
+    term31.text.includes('class="staff-logins"') &&
+    term31.text.includes('<a class="staff-btn" href="/teacher">Teacher Login</a>') &&
+    term31.text.includes('<a class="staff-btn" href="/admin">Admin Login</a>') &&
+    term31.text.includes('<a class="staff-btn" href="/principal">Principal Login</a>'));
   check('terminal staff dropdown is GONE (no menu button, dropdown, or old label)',
-    !home31.text.includes('staff-menu-btn') && !home31.text.includes('staff-dropdown') &&
-    !home31.text.includes('staff-menu-list') && !home31.text.includes('Staff / Faculty Login'));
+    !term31.text.includes('staff-menu-btn') && !term31.text.includes('staff-dropdown') &&
+    !term31.text.includes('staff-menu-list') && !term31.text.includes('Staff / Faculty Login'));
   check('student.js has no staff-menu code left (no initStaffMenu, no dropdown wiring)',
     !stuSrc.includes('initStaffMenu') && !stuSrc.includes('staff-menu-btn') &&
     !stuSrc.includes('staff-menu-list'));
+
+  console.log('\n[32] v1.13.1 — origin-aware home page (localhost staff landing, LAN terminal)');
+  // The user asked twice why the Admin PC's home page shows the student
+  // verify form ('admin thori test dega'). On localhost, '/' now serves
+  // the staff landing; LAN requests still get the terminal; /student
+  // always serves the terminal. Only the socket's remote address decides
+  // — headers are never trusted (spoofable on a LAN).
+  const { isLocalhostAddress } = require('./server.js');
+  check('origin function: loopback addresses are localhost (127.0.0.1, ::1, ::ffff:127.0.0.1)',
+    isLocalhostAddress('127.0.0.1') === true && isLocalhostAddress('::1') === true &&
+    isLocalhostAddress('::ffff:127.0.0.1') === true);
+  check('origin function: LAN/private addresses are NOT localhost',
+    isLocalhostAddress('192.168.1.10') === false && isLocalhostAddress('10.0.0.5') === false &&
+    isLocalhostAddress('172.16.0.9') === false && isLocalhostAddress('198.19.0.2') === false);
+  check('origin function: non-address values are NOT localhost',
+    isLocalhostAddress(undefined) === false && isLocalhostAddress(null) === false &&
+    isLocalhostAddress('') === false && isLocalhostAddress('localhost') === false);
+  const landingDirect = await req('GET', '/staff-landing.html');
+  check('staff landing file serves directly (public static file, login links only)',
+    landingDirect.status === 200 && landingDirect.text.includes('id="staff-landing"') &&
+    !landingDirect.text.includes('<form'));
+  const xff = await fetch(BASE + '/', { headers: { 'X-Forwarded-For': '192.168.1.99' } });
+  const xffText = await xff.text();
+  check('X-Forwarded-For is IGNORED: localhost / with a spoofed LAN header still serves the staff landing',
+    xffText.includes('id="staff-landing"') && !xffText.includes('stu-verify-form'));
+  // Live LAN-branch check: fetch / via a non-loopback IPv4 of this machine
+  // (the server binds 0.0.0.0, so the request arrives with a LAN source
+  // address and must get the terminal). Skipped where no LAN IPv4 exists.
+  let lanIp = null;
+  for (const ifs of Object.values(os.networkInterfaces())) {
+    for (const i of ifs || []) {
+      if (i.family === 'IPv4' && !i.internal) { lanIp = i.address; break; }
+    }
+    if (lanIp) break;
+  }
+  if (lanIp) {
+    const port = new URL(BASE).port || '80';
+    try {
+      const lanHome = await fetch('http://' + lanIp + ':' + port + '/');
+      const lanText = await lanHome.text();
+      check('LAN branch (live): / from a non-loopback address serves the Student Terminal',
+        lanHome.status === 200 && lanText.includes('stu-verify-form') && !lanText.includes('id="staff-landing"'), 'lanIp=' + lanIp);
+    } catch (e) {
+      // Sandboxed runtimes may block direct TCP to a non-loopback address;
+      // the unit-level origin checks above already cover the LAN branch.
+      console.log('  (LAN live fetch blocked in this environment — LAN branch covered by the unit checks above)');
+    }
+  } else {
+    console.log('  (no non-loopback IPv4 — LAN-branch live check skipped)');
+  }
 
   console.log('\n========================================');
   console.log('E2E RESULT: ' + pass + ' PASS, ' + fail + ' FAIL');
