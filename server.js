@@ -28,6 +28,11 @@
 // and the lab import dedupes by (roll, test_id) across laptops (the first
 // submission is kept, the rest are rejected and counted). Lab drafts are
 // client-side only (lab-template.html) — no server change for them.
+// v1.10.1: three anti-cheat warnings before auto-lock (lock on the 4th
+// switch — client-side only, no server change for that); theory marking
+// back to the teacher — theory is NEVER auto-graded (stored key words
+// from v1.9.0 tests are ignored), only MCQ + FIB auto-grade. A submission
+// goes straight to Admin only when it has NO theory questions.
 
 'use strict';
 
@@ -38,7 +43,7 @@ const crypto = require('crypto');
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = '0.0.0.0';
-const VERSION = '1.10.0';
+const VERSION = '1.10.1';
 const ROOT = __dirname;
 const DATA_DIR = path.join(ROOT, 'data');
 const PUBLIC_DIR = path.join(ROOT, 'public');
@@ -410,8 +415,10 @@ function createApp(store) {
       } else if (q.type === 'theory') {
         if (typeof q.question !== 'string' || !q.question.trim()) return 'question ' + i + ': text required';
         if (!Number.isFinite(+q.max_marks) || +q.max_marks <= 0) return 'question ' + i + ': max_marks must be positive';
-        // v1.9.0: key_words (comma-separated) makes the question auto-gradable.
-        // No key words -> the question stays teacher-graded, as before.
+        // v1.10.1: key_words is accepted but IGNORED — theory is always
+        // teacher-graded (user decision, v1.9.0 keyword auto-grading
+        // removed); old tests may still carry the field, it just does
+        // nothing now.
         if (q.key_words !== undefined && typeof q.key_words !== 'string') return 'question ' + i + ': key_words must be text';
       } else if (q.type === 'fib') {
         // Fill-in-the-blank (v1.9.0): suggested_answer IS the auto-check key —
@@ -427,38 +434,21 @@ function createApp(store) {
 
   // --- grading --------------------------------------------------------------
   // Auto-grade from the STORED test — never trust client-supplied scores.
-  // v1.9.0: FIB + theory are auto-graded too when Admin supplied a key:
+  // v1.9.0/v1.10.1: MCQ + FIB are auto-graded; theory is ALWAYS
+  // teacher-graded (v1.9.0 theory keyword auto-grading was removed by
+  // user decision in v1.10.1 — stored key words are ignored):
   //   - FIB with a suggested answer: exact match (forgiving: case-insensitive,
   //     trimmed, internal whitespace collapsed) -> full max_marks, else 0.
-  //   - Theory with key words: marks = round(max_marks x matched / total).
-  //     HONEST LIMIT: there is no AI offline, so real concept understanding
-  //     is impossible — keyword matching is the method and it is rough.
-  //   - FIB without a suggested answer / theory without key words: NOT
-  //     auto-graded — they stay teacher-graded (fully_auto = false).
+  //   - FIB without a suggested answer: NOT auto-graded — teacher-graded.
+  //   - Theory: NEVER auto-graded (fully_auto = false whenever a test
+  //     contains a theory question).
   // Auto marks are returned in auto_marks {questionIndex: mark} and are
   // pre-filled into theory_marks at insert, so totals, reports and
   // consolidation work unchanged. fully_auto is true only when EVERY
   // non-MCQ question was auto-graded (an MCQ-only test is fully auto
-  // by definition).
+  // by definition; a test with ANY theory question is never fully auto).
   function normAnswerText(s) {
     return String(s == null ? '' : s).toLowerCase().replace(/\s+/g, ' ').trim();
-  }
-  function parseKeyWords(raw) {
-    if (typeof raw !== 'string') return [];
-    return raw.split(',').map((k) => normAnswerText(k)).filter(Boolean);
-  }
-  function normForMatch(s) {
-    // Padded, lowercased, punctuation -> spaces: matching ' word ' inside
-    // ' ... answer ... ' then matches whole words/phrases only, never a
-    // substring inside another word ('photo' never matches 'photosynthesis').
-    return ' ' + String(s == null ? '' : s).toLowerCase()
-      .replace(/[^\p{L}\p{N}]+/gu, ' ').replace(/\s+/g, ' ').trim() + ' ';
-  }
-  function keywordMatched(answer, kw) {
-    const k = String(kw || '').toLowerCase()
-      .replace(/[^\p{L}\p{N}]+/gu, ' ').replace(/\s+/g, ' ').trim();
-    if (!k) return false;
-    return normForMatch(answer).includes(' ' + k + ' ');
   }
   function gradeSubmission(test, answers) {
     const byQ = {};
@@ -481,15 +471,10 @@ function createApp(store) {
           fully_auto = false;
         }
       } else if (q.type === 'theory') {
+        // v1.10.1: theory is ALWAYS teacher-graded — never auto-marked,
+        // even if the stored test still carries v1.9.0 key words.
         theory_max += +q.max_marks || 0;
-        const kws = parseKeyWords(q.key_words);
-        if (kws.length) {
-          let matched = 0;
-          for (const kw of kws) if (keywordMatched(byQ[i], kw)) matched++;
-          auto_marks[i] = Math.round((+q.max_marks || 0) * matched / kws.length);
-        } else {
-          fully_auto = false;
-        }
+        fully_auto = false;
       }
     });
     const auto_total = Object.values(auto_marks).reduce((s, v) => s + (+v || 0), 0);
@@ -911,10 +896,11 @@ function createApp(store) {
       }
       // Clamp each mark to [0, max_marks] of its theory/FIB question; ignore
       // MCQ indexes (MCQs are auto-graded from the Admin's key — a mark sent
-      // for an MCQ index can never change the score). v1.9.0: also ignore
-      // marks for AUTO-graded questions (FIB with a key, theory with key
-      // words) — the teacher grades only the non-auto questions; the
-      // server-assigned auto mark is read-only and can never be overwritten.
+      // for an MCQ index can never change the score). v1.9.0/v1.10.1: also
+      // ignore marks for AUTO-graded questions (FIB with a key only — theory
+      // is always teacher-graded since v1.10.1) — the teacher grades only
+      // the non-auto questions; the server-assigned auto mark is read-only
+      // and can never be overwritten.
       const test = store.findOne('tests', s.test_id);
       const marks = Object.assign({}, s.theory_marks || {});
       for (const [k, v] of Object.entries(b.theory_marks)) {

@@ -890,3 +890,62 @@ imports and the online/lab duplicate is caught (already_taken 1).
 Screenshots: v1100-already-taken.png, v1100-draft-restored.png in the
 project folder (not shipped in the ZIP).
 Version bumped to 1.10.0.
+
+## v1.10.1 (2026-11-16) — Three anti-cheat warnings + theory marking back to the teacher
+
+Two user orders (19:39 and 19:40 PST).
+
+(1) The anti-cheat warning now comes THREE times before the test locks:
+1st, 2nd and 3rd tab switch each show a blocking warning modal that says
+which warning it is — "Warning 1 of 3", "Warning 2 of 3", "Final
+Warning" (the 3rd says it is the last: "Final warning: if you switch
+again, your test will be locked."). The 4th switch auto-locks and
+auto-submits, as before. The exam timer keeps running through every
+warning. Same threshold in the online terminal and the lab app. The
+teacher banner is unchanged — it shows the number of times the student
+left the page (now 4 on an auto-locked test) plus "The test was
+auto-locked."
+
+(2) Theory marking is back with the teacher — the user's verdict on the
+v1.9.0 auto-grading. MCQ + fill-in-the-blank stay auto-graded; theory
+questions are ALWAYS teacher-graded. What changed: the server no longer
+auto-marks theory at all (the keyword-matching code is removed —
+parseKeyWords / normForMatch / keywordMatched deleted); stored key
+words in existing v1.9.0 tests are IGNORED (no data migration — the
+field is still accepted on save so old tests keep working, it just
+does nothing). The 'Key words' field is removed from the test builder;
+the Model answer field stays (the teacher sees it while grading, as
+before v1.9.0) and the FIB 'Correct answer (auto-checked)' field stays.
+Routing: any submission containing a theory question goes to the
+teacher (who grades theory only — MCQ + FIB auto marks show read-only
+with the 'Auto' tag and can never be overwritten); ONLY submissions
+with NO theory questions (MCQ + FIB only) go straight to Admin. The
+lab pack stripAnswers is unchanged (it already strips keys).
+
+Tests: E2E 299 PASS, 0 FAIL (was 296; +1 in §24 — the three warning
+texts + dynamic modal slot — +2 in §25: theory with stored key words
+routes to the teacher even when everything else is auto-gradable, and
+the teacher CAN re-grade a theory mark; §25 rewritten for the new
+rule — mixed total at submit 5 not 9, fully-auto is MCQ + FIB only
+5/5, builder has NO key_words field). e2e-sync-test.js 58 PASS,
+0 FAIL (was 57; +1 — the lab pack has no theory key words; the sync
+theory question now carries stored key words and is NOT auto-graded at
+import; LAB001's auto-lock is now tab_switches 4). Headless-Chromium
+check (CDP, real server, 0 JS errors, 35/35 checks): online warnings
+1 of 3 / 2 of 3 / Final Warning with exact text, timer keeps running,
+4th switch auto-locks (stored tab_switches 4 + auto_locked true,
+routed to teacher, FIB auto only); teacher banner shows 4 switches +
+auto-locked, theory has an editable marks input, FIB auto mark is
+read-only with the Auto tag, grading theory 4/5 saves (total 9/10);
+MCQ+FIB-only submission goes straight to Admin; builder theory card
+has no Key words input and keeps the Model answer; lab app: same
+3 warnings + lock on 4th offline, exported JSON + import carry the
+flags. Lab smoke of the real exported STC-Lab.html (file://, 0 JS
+errors, 15/15 checks): zero external refs, no answer keys in the
+pack, wrong roll locks with the English message, submit saves to
+localStorage, result screen shows no scores, Export downloads JSON,
+Clear is confirm-guarded, the imported lab submission grades FIB auto
+and routes theory to the teacher.
+Screenshots: v1101-final-warning.png, v1101-teacher-theory-grading.png
+in the project folder (not shipped in the ZIP).
+Version bumped to 1.10.1.

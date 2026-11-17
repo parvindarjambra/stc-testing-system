@@ -1,7 +1,8 @@
-// STC Testing System — USB-sync verification script (v1.10.0: offline labs,
-// import dedupes by (roll, test) — the first submission is kept, later
-// attempts rejected and counted; auto-grading via the shared server path —
-// FIB auto-checked, theory without key words still teacher-graded).
+// STC Testing System — USB-sync verification script (v1.10.1: theory always
+// teacher-graded — stored key words ignored at import; auto-lock on the
+// 4th tab switch; v1.10.0: offline labs, import dedupes by (roll, test) —
+// the first submission is kept, later attempts rejected and counted;
+// auto-grading via the shared server path — FIB auto-checked).
 // Tests the full offline-lab loop WITHOUT a browser:
 //   seed students + a monthly test via the Admin API -> export the lab pack
 //   (GET /api/lab-pack) -> build lab submissions EXACTLY in the format the
@@ -58,7 +59,7 @@ async function main() {
 
   console.log('\n[1] Health + admin login');
   const h = await req('GET', '/api/health');
-  check('health 200 + version 1.10.0', h.status === 200 && h.json && h.json.version === '1.10.0', h.json && h.json.version);
+  check('health 200 + version 1.10.1', h.status === 200 && h.json && h.json.version === '1.10.1', h.json && h.json.version);
   const admin = await login('admin', 'admin123', 'admin');
   check('admin login', !!(admin && admin.token));
   if (!admin) { console.log('FATAL: admin login failed'); process.exit(1); }
@@ -88,7 +89,8 @@ async function main() {
       { type: 'mcq', question: 'What is 2 + 2?', options: ['3', '4', '5', '6'], correct: 1, marks: 2 },
       { type: 'mcq', question: 'Capital of Pakistan?', options: ['Lahore', 'Karachi', 'Islamabad', 'Quetta'], correct: 2, marks: 3 },
       { type: 'fib', question: 'The chemical symbol for water is ___.', max_marks: 2, suggested_answer: 'H2O-SUGGESTED-ONLY' },
-      { type: 'theory', question: 'Explain photosynthesis.', max_marks: 5 },
+      { type: 'theory', question: 'Explain photosynthesis.', max_marks: 5,
+        model_answer: 'MODEL-ANSWER-SYNC-SECRET', key_words: 'sunlight, chlorophyll, SYNC-KEYWORD-SECRET' },
     ],
   }, admin.token);
   check('monthly test created', t.status === 201, t.status + ' ' + t.text.slice(0, 120));
@@ -113,6 +115,9 @@ async function main() {
     !pack.text.includes('"correct"'), 'leaked "correct" into the pack');
   check('pack has NO fib suggested answer (value + key absent)',
     !pack.text.includes('H2O-SUGGESTED-ONLY') && !pack.text.includes('suggested_answer'));
+  check('pack has NO theory key words (value + key absent)',
+    !pack.text.includes('SYNC-KEYWORD-SECRET') && !pack.text.includes('key_words') &&
+    !pack.text.includes('MODEL-ANSWER-SYNC-SECRET'));
   check('pack has NO fetch / network calls',
     !pack.text.includes('fetch(') && !pack.text.includes('XMLHttpRequest'));
   const packIdMatch = /"pack_id"\s*:\s*"([^"]+)"/.exec(pack.text);
@@ -125,7 +130,7 @@ async function main() {
   //   submitted_at }, wrapped in the export envelope.
   const nowIso = new Date().toISOString();
   const envelope = {
-    format: 'stc-lab-submissions', version: '1.10.0', pack_id: packId,
+    format: 'stc-lab-submissions', version: '1.10.1', pack_id: packId,
     exported_at: nowIso,
     submissions: [
       {
@@ -135,8 +140,8 @@ async function main() {
           { q: 2, answer: 'H2O' }, { q: 3, answer: 'Plants make food using sunlight.' },
         ],
         submitted_at: nowIso,
-        // v1.8.0: LAB001 was auto-locked for tab-switching in the lab app.
-        tab_switches: 2, auto_locked: true,
+        // v1.8.0/v1.10.1: LAB001 was auto-locked for tab-switching in the lab app (4th switch).
+        tab_switches: 4, auto_locked: true,
       },
       {
         client_id: 'c-sync-002', student: { roll_number: 'LAB002' }, test_id: testId,
@@ -176,16 +181,16 @@ async function main() {
       sub1.theory_max === 7 && sub2.theory_max === 7);
     check('max_total 12 on both', sub1.max_total === 12 && sub2.max_total === 12);
     check('total = mcq_score before grading', sub1.total === 2 && sub2.total === 5);
-    // v1.9.0: the FIB 'H2O' does not match the key 'H2O-SUGGESTED-ONLY', so
+    // v1.9.0/v1.10.1: the FIB 'H2O' does not match the key 'H2O-SUGGESTED-ONLY', so
     // it is auto-graded 0 at import (theory_marks {2: 0}, auto_marks {2: 0});
-    // the theory question has no key words, so it stays teacher-graded and
-    // the submission still routes to the teacher (status submitted).
+    // the theory question is ALWAYS teacher-graded (v1.10.1 — its stored
+    // key words are ignored), so the submission routes to the teacher.
     check('status submitted + auto FIB 0 in theory_marks + not locked',
       sub1.status === 'submitted' && sub2.status === 'submitted' &&
       sub1.theory_marks && sub1.theory_marks['2'] === 0 &&
       sub1.auto_marks && sub1.auto_marks['2'] === 0 && !sub1.locked,
       JSON.stringify(sub1 && { tm: sub1.theory_marks, am: sub1.auto_marks }));
-    check('theory without key words NOT auto-graded (no auto_marks[3])',
+    check('theory with stored key words NOT auto-graded at import (no auto_marks[3])',
       sub1.auto_marks && sub1.auto_marks['3'] === undefined &&
       sub2.auto_marks && sub2.auto_marks['3'] === undefined);
     check('teacher routed from registered record (kelash / ashok)',
@@ -195,8 +200,8 @@ async function main() {
     check('student details rebuilt from register (name/course/shift)',
       sub1.student_name === 'Sync Student One' && sub1.course === 'DIT' && sub1.shift === SHIFT);
     check('answers stored as submitted', Array.isArray(sub1.answers) && sub1.answers.length === 4);
-    check('LAB001 keeps anti-cheat flags from the lab file (tab_switches 2, auto_locked true)',
-      sub1.tab_switches === 2 && sub1.auto_locked === true,
+    check('LAB001 keeps anti-cheat flags from the lab file (tab_switches 4, auto_locked true)',
+      sub1.tab_switches === 4 && sub1.auto_locked === true,
       JSON.stringify({ t: sub1.tab_switches, l: sub1.auto_locked }));
     check('LAB002 defaults tab_switches 0 + auto_locked false',
       sub2.tab_switches === 0 && sub2.auto_locked === false,
@@ -280,7 +285,7 @@ async function main() {
   // (Their first submissions are now final / sent_to_admin — the block
   // applies whatever the grading status.)
   const dupEnvelope = {
-    format: 'stc-lab-submissions', version: '1.10.0', pack_id: packId,
+    format: 'stc-lab-submissions', version: '1.10.1', pack_id: packId,
     exported_at: nowIso,
     submissions: [
       {

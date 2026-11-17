@@ -299,9 +299,10 @@ function stopTimer() {
   if (S.timerId) { clearInterval(S.timerId); S.timerId = null; }
 }
 
-/* Anti-cheat (v1.8.0): while an exam is active, leaving the exam page
-   (tab hidden OR window loses focus) is counted. 1st switch: a blocking
-   warning modal (the exam timer keeps running). 2nd switch: the test
+/* Anti-cheat (v1.8.0, warnings x3 in v1.10.1): while an exam is active,
+   leaving the exam page (tab hidden OR window loses focus) is counted.
+   1st, 2nd and 3rd switch: a blocking warning modal (the exam timer
+   keeps running) that says which warning it is. 4th switch: the test
    locks and auto-submits with the answers so far. Listeners run ONLY
    during an exam — never on the verify/details/test-picker screens.
    One switch can fire BOTH visibilitychange and blur, so S.away dedupes
@@ -334,12 +335,26 @@ function onExamLeave() {
   if (!S.antiCheatOn || S.examLocked || S.away || !S.test) return;
   S.away = true;
   S.tabSwitches++;
-  if (S.tabSwitches === 1) {
-    $('ac-modal').classList.remove('hidden');
-    $('ac-continue').focus();
+  // v1.10.1: three warnings before the lock — warn on switches 1-3,
+  // auto-lock on the 4th.
+  if (S.tabSwitches <= 3) {
+    showAcWarning(S.tabSwitches);
   } else {
     lockExam();
   }
+}
+function showAcWarning(n) {
+  // v1.10.1: the modal says which warning it is (the 3rd is the last).
+  const titles = { 1: '⚠️ Warning 1 of 3', 2: '⚠️ Warning 2 of 3', 3: '⚠️ Final Warning' };
+  const texts = {
+    1: 'Warning 1 of 3: Do not leave the exam page. If you keep switching, your test will be locked.',
+    2: 'Warning 2 of 3: Do not leave the exam page. One more warning and your test will be locked.',
+    3: 'Final warning: if you switch again, your test will be locked.'
+  };
+  $('ac-modal-title').textContent = titles[n];
+  $('ac-modal-text').textContent = texts[n];
+  $('ac-modal').classList.remove('hidden');
+  $('ac-continue').focus();
 }
 function hideAcWarning() {
   $('ac-modal').classList.add('hidden');

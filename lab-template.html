@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- =====================================================================
-     STC Testing System — Offline Lab App (USB sync, v1.10.0).
+     STC Testing System — Offline Lab App (USB sync, v1.10.1).
      Super Sys-Tech Computers Centre, Umerkot.
 
      SELF-CONTAINED: inline CSS + inline JS, ZERO external references,
@@ -194,13 +194,15 @@ th { color: #475569; font-weight: 600; width: 38%; }
 
 </main>
 
-<!-- Anti-cheat warning (v1.8.0): blocking modal shown the FIRST time the
-     student leaves the exam page during an exam. The exam timer keeps
-     running while it is up; a second switch locks the test instead. -->
+<!-- Anti-cheat warning (v1.8.0, x3 warnings in v1.10.1): blocking modal
+     shown on the 1st, 2nd and 3rd time the student leaves the exam page
+     during an exam (the text is set by the lab script — which warning
+     it is). The exam timer keeps running while it is up; a 4th switch
+     locks the test instead. -->
 <div id="ac-modal" class="modal-overlay hidden" role="alertdialog" aria-modal="true" aria-labelledby="ac-modal-title">
   <div class="modal-card">
     <h3 id="ac-modal-title">⚠️ Warning</h3>
-    <p>Warning: Do not leave the exam page. If you switch again, your test will be locked.</p>
+    <p id="ac-modal-text">Warning 1 of 3: Do not leave the exam page. If you keep switching, your test will be locked.</p>
     <button class="btn btn-primary btn-big" type="button" id="ac-continue">Continue Exam</button>
   </div>
 </div>
@@ -243,7 +245,7 @@ function toast(msg, ok) {
 
 /* ---------------- state ---------------- */
 /* Anti-cheat (v1.8.0): tabSwitches counts how many times the student left
-   the exam page; examLocked is set on the 2nd switch (auto-submit); away
+   the exam page; examLocked is set on the 4th switch (auto-submit); away
    dedupes the visibilitychange + blur pair one switch can fire, and is
    cleared when the student returns. */
 var S = { student: null, test: null, answers: {}, timerId: null, endsAt: 0, currentQ: 0,
@@ -594,10 +596,11 @@ function stopTimer() {
   if (S.timerId) { clearInterval(S.timerId); S.timerId = null; }
 }
 
-/* Anti-cheat (v1.8.0): same rules as the online terminal — while an exam
-   is active, leaving the exam page (tab hidden OR window loses focus) is
-   counted. 1st switch: a blocking warning modal (the exam timer keeps
-   running). 2nd switch: the test locks and auto-submits with the answers
+/* Anti-cheat (v1.8.0, warnings x3 in v1.10.1): same rules as the online
+   terminal — while an exam is active, leaving the exam page (tab hidden
+   OR window loses focus) is counted. 1st, 2nd and 3rd switch: a blocking
+   warning modal (the exam timer keeps running) that says which warning
+   it is. 4th switch: the test locks and auto-submits with the answers
    so far. Listeners run ONLY during an exam. One switch can fire BOTH
    visibilitychange and blur, so S.away dedupes them: only the first
    event of an "away" episode counts, and returning (tab visible again /
@@ -630,12 +633,26 @@ function onExamLeave() {
   S.away = true;
   S.tabSwitches++;
   saveDraft();   /* v1.10.0: persist the switch count, so closing the file cannot wipe a warning */
-  if (S.tabSwitches === 1) {
-    $('ac-modal').classList.remove('hidden');
-    $('ac-continue').focus();
+  /* v1.10.1: three warnings before the lock — warn on switches 1-3,
+     auto-lock on the 4th. */
+  if (S.tabSwitches <= 3) {
+    showAcWarning(S.tabSwitches);
   } else {
     lockExam();
   }
+}
+function showAcWarning(n) {
+  /* v1.10.1: the modal says which warning it is (the 3rd is the last). */
+  var titles = { 1: '⚠️ Warning 1 of 3', 2: '⚠️ Warning 2 of 3', 3: '⚠️ Final Warning' };
+  var texts = {
+    1: 'Warning 1 of 3: Do not leave the exam page. If you keep switching, your test will be locked.',
+    2: 'Warning 2 of 3: Do not leave the exam page. One more warning and your test will be locked.',
+    3: 'Final warning: if you switch again, your test will be locked.'
+  };
+  $('ac-modal-title').textContent = titles[n];
+  $('ac-modal-text').textContent = texts[n];
+  $('ac-modal').classList.remove('hidden');
+  $('ac-continue').focus();
 }
 function hideAcWarning() {
   $('ac-modal').classList.add('hidden');
@@ -751,7 +768,7 @@ function exportSubmissions() {
     '-' + pad(now.getHours()) + pad(now.getMinutes());
   var envelope = {
     format: 'stc-lab-submissions',
-    version: '1.10.0',
+    version: '1.10.1',
     pack_id: (LAB_PACK && LAB_PACK.pack_id) || null,
     exported_at: now.toISOString(),
     submissions: saved

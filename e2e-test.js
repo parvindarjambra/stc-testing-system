@@ -1,9 +1,12 @@
-// STC Testing System — end-to-end verification script (v1.10.0: one student,
-// one attempt per test (server blocks a second start + second submit; lab
+// STC Testing System — end-to-end verification script (v1.10.1: three
+// anti-cheat warnings before auto-lock (lock on the 4th switch); theory
+// marking back to the teacher — MCQ + FIB auto-graded, theory ALWAYS
+// teacher-graded (stored key words ignored); v1.10.0: one student, one
+// attempt per test (server blocks a second start + second submit; lab
 // import dedupes by roll + test) + lab durability (draft auto-save, restore
-// on reopen); auto-grading — FIB auto-check + theory keyword auto-grading,
-// fully-auto submissions straight to Admin, teacher flow kept as fallback;
-// anti-cheat tab-switch warning + auto-lock + teacher flag; full-width
+// on reopen); auto-grading — FIB auto-check, fully-auto (MCQ + FIB only)
+// submissions straight to Admin, teacher flow kept as fallback;
+// anti-cheat tab-switch warnings + auto-lock + teacher flag; full-width
 // consoles, inline validation errors, no student back/change; no demo hints
 // in the UI; four-field student verification, real logo, back-to-home,
 // teacher import, fill-in-the-blank, course-wise results).
@@ -74,7 +77,7 @@ async function main() {
   const h = await req('GET', '/api/health');
   check('health 200 + ok', h.status === 200 && h.json && h.json.ok === true, JSON.stringify(h.json));
   check('db backend reported', h.json && (h.json.db === 'sqlite' || h.json.db === 'json'), h.json && h.json.db);
-  check('version is 1.10.0', h.json && h.json.version === '1.10.0', h.json && h.json.version);
+  check('version is 1.10.1', h.json && h.json.version === '1.10.1', h.json && h.json.version);
   const home = await req('GET', '/');
   check('home is the Student Terminal (institute name + verify form + heading)',
     home.status === 200 && home.text.includes('Super Sys-Tech Computers Centre') &&
@@ -768,7 +771,7 @@ async function main() {
   check('dead .btn-link CSS removed (only used by the back link) (v1.7.0)',
     !css.text.includes('.btn-link'));
 
-  console.log('\n[24] v1.8.0 — anti-cheat: tab-switch warning, auto-lock, teacher flag');
+  console.log('\n[24] v1.8.0/v1.10.1 — anti-cheat: 3 warnings, auto-lock on 4th switch, teacher flag');
   // v1.10.0: one student, one attempt — E2E-001 already submitted dit in §7,
   // so the three flag checks need three fresh students (all DIT, kelash).
   const acStudents = [];
@@ -823,12 +826,16 @@ async function main() {
   // Code: online terminal detection + warning + lock.
   check('student.js listens to visibilitychange + blur during the exam (v1.8.0)',
     stuSrc.includes("addEventListener('visibilitychange'") && stuSrc.includes("addEventListener('blur'"));
-  check('student.js warns on 1st switch, locks + auto-submits on 2nd (v1.8.0)',
-    stuSrc.includes('ac-modal') &&
+  check('student.js warns on 1st/2nd/3rd switch, locks + auto-submits on 4th (v1.10.1)',
+    stuSrc.includes('showAcWarning') && stuSrc.includes('S.tabSwitches <= 3') &&
     stuSrc.includes('Your test has been locked because you left the exam page') &&
     stuSrc.includes('lockExam') && stuSrc.includes('startAntiCheat'));
-  check('student modal carries the exact warning text (v1.8.0)',
-    stuHtml.includes('Warning: Do not leave the exam page. If you switch again, your test will be locked.'));
+  check('student.js carries the 3 warning texts (1 of 3, 2 of 3, Final warning) (v1.10.1)',
+    stuSrc.includes('Warning 1 of 3: Do not leave the exam page') &&
+    stuSrc.includes('Warning 2 of 3: Do not leave the exam page') &&
+    stuSrc.includes('Final warning: if you switch again, your test will be locked.'));
+  check('student modal has a dynamic text slot (ac-modal-text) (v1.10.1)',
+    stuHtml.includes('id="ac-modal-text"') && stuHtml.includes('id="ac-modal-title"'));
   check('student payload carries tab_switches + auto_locked (v1.8.0)',
     stuSrc.includes('tab_switches: S.tabSwitches') && stuSrc.includes('auto_locked: S.examLocked'));
   check('student modal markup present (ac-modal + Continue button) (v1.8.0)',
@@ -841,16 +848,22 @@ async function main() {
   check('teacher.js shows the tab-switch banner in the grading view (v1.8.0)',
     teaJs13.includes('grade-flag') && teaJs13.includes('left the exam page') && teaJs13.includes('auto-locked'));
   // Code: lab app mirrors the online flow.
-  check('lab app has the same detection + warning + lock (v1.8.0)',
+  check('lab app has the same detection + 3 warnings + lock on 4th (v1.10.1)',
     labSrc.includes("addEventListener('visibilitychange'") && labSrc.includes("addEventListener('blur'") &&
-    labSrc.includes('If you switch again, your test will be locked') &&
+    labSrc.includes('showAcWarning') && labSrc.includes('S.tabSwitches <= 3') &&
+    labSrc.includes('Warning 1 of 3: Do not leave the exam page') &&
+    labSrc.includes('Final warning: if you switch again, your test will be locked.') &&
     labSrc.includes('Your test has been locked because you left the exam page'));
   check('lab payload carries tab_switches + auto_locked (v1.8.0)',
     labSrc.includes('tab_switches: S.tabSwitches') && labSrc.includes('auto_locked: S.examLocked'));
 
-  console.log('\n[25] v1.9.0 — auto-grading: FIB auto-check + theory keywords, straight to Admin');
-  // Mixed test: MCQ + FIB with key + FIB without key + theory with key words
-  // + theory without key words. Fully-auto test: every question auto-gradable.
+  console.log('\n[25] v1.9.0/v1.10.1 — auto-grading: MCQ + FIB auto, theory always teacher-graded');
+  // Mixed test: MCQ + FIB with key + FIB without key + theory WITH stored
+  // key words + theory without key words (v1.10.1: the stored key words
+  // are IGNORED — theory is never auto-graded). Fully-auto test: MCQ +
+  // FIB with key only (NO theory) — the only kind that goes straight to
+  // Admin. Theory test: MCQ + FIB with key + theory with key words — it
+  // routes to the teacher ONLY because of the theory question.
   const autoA = await req('POST', '/api/tests', {
     title: 'DIT Auto-Grade Test', course: 'DIT', type: 'daily-quiz',
     duration_minutes: 30, randomize: 0,
@@ -871,15 +884,25 @@ async function main() {
     questions: [
       { type: 'mcq', question: 'Auto MCQ 2?', options: ['a', 'b', 'c', 'd'], correct: 0, marks: 2 },
       { type: 'fib', question: 'The capital of Pakistan is ___.', suggested_answer: 'Islamabad', max_marks: 3 },
+    ],
+  }, admin.token);
+  const autoC = await req('POST', '/api/tests', {
+    title: 'CIT Theory-Routes Test', course: 'CIT', type: 'daily-quiz',
+    duration_minutes: 30, randomize: 0,
+    questions: [
+      { type: 'mcq', question: 'Auto MCQ 3?', options: ['a', 'b', 'c', 'd'], correct: 0, marks: 2 },
+      { type: 'fib', question: 'The capital of Sindh is ___.', suggested_answer: 'Karachi', max_marks: 3 },
       { type: 'theory', question: 'Explain the water cycle.', max_marks: 6,
         model_answer: 'MODEL-ANSWER-WATER-SECRET',
         key_words: 'evaporation, condensation, precipitation' },
     ],
   }, admin.token);
-  check('setup: mixed + fully-auto tests created (both 201)',
-    autoA.status === 201 && autoB.status === 201, 'A ' + autoA.status + ', B ' + autoB.status);
+  check('setup: mixed + fully-auto + theory-routes tests created (all 201)',
+    autoA.status === 201 && autoB.status === 201 && autoC.status === 201,
+    'A ' + autoA.status + ', B ' + autoB.status + ', C ' + autoC.status);
   const autoAId = autoA.json && autoA.json.test && autoA.json.test.id;
   const autoBId = autoB.json && autoB.json.test && autoB.json.test.id;
+  const autoCId = autoC.json && autoC.json.test && autoC.json.test.id;
   // Mixed submission (E2E-001, kelash): MCQ right; FIB 'paris' (lowercase);
   // theory with 2 of 4 key words (sunlight + chlorophyll).
   const mixSub = await req('POST', '/api/submissions', {
@@ -896,57 +919,79 @@ async function main() {
   const mix1 = mixSub.json && mixSub.json.submission;
   const mixFull = mix1 ? await req('GET', '/api/submissions/' + mix1.id, null, admin.token) : null;
   const mixF = mixFull && mixFull.json && mixFull.json.submission;
-  check('mixed submit routes to teacher (FIB2 + theory2 not auto-gradable)',
+  check('mixed submit routes to teacher (FIB2 + both theory questions not auto-gradable)',
     mix1 && mix1.status === 'submitted', JSON.stringify(mix1 && mix1.status));
   check('FIB auto correct + case-tolerant: auto_marks[1] = 3',
     mixF && mixF.auto_marks && mixF.auto_marks['1'] === 3, JSON.stringify(mixF && mixF.auto_marks));
-  check('theory keyword partial: 2/4 keywords -> auto_marks[3] = 4 (max 8)',
-    mixF && mixF.auto_marks && mixF.auto_marks['3'] === 4, JSON.stringify(mixF && mixF.auto_marks));
-  check('total at submit = 9 (MCQ 2 + auto FIB 3 + auto theory 4)',
-    mix1 && mix1.total === 9, mix1 && mix1.total);
+  check('theory with stored key words NOT auto-graded (no auto_marks[3], v1.10.1)',
+    mixF && mixF.auto_marks && mixF.auto_marks['3'] === undefined, JSON.stringify(mixF && mixF.auto_marks));
+  check('total at submit = 5 (MCQ 2 + auto FIB 3; theory unmarked)',
+    mix1 && mix1.total === 5, mix1 && mix1.total);
   const gradeMix = await req('POST', '/api/submissions/' + mix1.id + '/grade',
-    { theory_marks: { 2: 2, 4: 5 } }, tokens.kelash.token);
+    { theory_marks: { 2: 2, 3: 4, 4: 5 } }, tokens.kelash.token);
   const gm = gradeMix.json && gradeMix.json.submission;
-  check('teacher grades only non-auto {2:2, 4:5} -> total 16/20, status graded',
+  check('teacher grades non-auto {2:2, 3:4, 4:5} -> total 16/20, status graded',
     gm && gm.total === 16 && gm.status === 'graded', gm && (gm.total + '/' + gm.max_total + ' ' + gm.status));
   const overWrite = await req('POST', '/api/submissions/' + mix1.id + '/grade',
-    { theory_marks: { 1: 0, 3: 0 } }, tokens.kelash.token);
+    { theory_marks: { 1: 0 } }, tokens.kelash.token);
   const ow = overWrite.json && overWrite.json.submission;
-  check('teacher cannot overwrite auto marks (re-mark 0 ignored, total stays 16)',
-    ow && ow.total === 16 && ow.theory_marks && ow.theory_marks['1'] === 3 && ow.theory_marks['3'] === 4,
+  check('teacher cannot overwrite auto FIB mark (re-mark 0 ignored, total stays 16)',
+    ow && ow.total === 16 && ow.theory_marks && ow.theory_marks['1'] === 3,
     JSON.stringify(ow && { t: ow.total, tm: ow.theory_marks }));
+  const reGrade = await req('POST', '/api/submissions/' + mix1.id + '/grade',
+    { theory_marks: { 3: 0 } }, tokens.kelash.token);
+  const rg = reGrade.json && reGrade.json.submission;
+  check('teacher CAN re-grade a theory mark (3: 4 -> 0, total 16 -> 12)',
+    rg && rg.total === 12 && rg.theory_marks && rg.theory_marks['3'] === 0,
+    JSON.stringify(rg && { t: rg.total, tm: rg.theory_marks }));
   const sendMix = await req('POST', '/api/submissions/' + mix1.id + '/send', {}, tokens.kelash.token);
   check('mixed result sent to Admin -> sent_to_admin (teacher flow intact)',
     sendMix.json && sendMix.json.submission && sendMix.json.submission.status === 'sent_to_admin');
   const finMix = await req('POST', '/api/submissions/' + mix1.id + '/finalize', {}, admin.token);
   check('mixed result finalized by Admin -> final',
     finMix.json && finMix.json.submission && finMix.json.submission.status === 'final');
-  // Fully-auto submission (E2E-002, ashok): every question auto-gradable.
+  // Fully-auto submission (E2E-002, ashok): MCQ + FIB only, no theory.
   const fullSub = await req('POST', '/api/submissions', {
     client_id: 'e2e-ag2-' + Date.now(),
     student: { roll_number: 'E2E-002' }, test_id: autoBId,
     answers: [
       { q: 0, answer: 0 },
       { q: 1, answer: '  ISLAMABAD  ' },
-      { q: 2, answer: 'Evaporation lifts water up, condensation forms clouds, precipitation falls as rain.' },
     ],
   });
   const full1 = fullSub.json && fullSub.json.submission;
   const fullFull = full1 ? await req('GET', '/api/submissions/' + full1.id, null, admin.token) : null;
   const fullF = fullFull && fullFull.json && fullFull.json.submission;
-  check('fully-auto submit goes straight to Admin (sent_to_admin, no teacher step)',
+  check('fully-auto (MCQ + FIB only) submit goes straight to Admin (sent_to_admin, no teacher step)',
     full1 && full1.status === 'sent_to_admin', JSON.stringify(full1 && full1.status));
   check('FIB whitespace + case tolerant: auto_marks[1] = 3',
     fullF && fullF.auto_marks && fullF.auto_marks['1'] === 3, JSON.stringify(fullF && fullF.auto_marks));
-  check('theory keyword full: 3/3 -> auto_marks[2] = 6',
-    fullF && fullF.auto_marks && fullF.auto_marks['2'] === 6, JSON.stringify(fullF && fullF.auto_marks));
-  check('fully-auto total 11/11 + graded_at set',
-    full1 && full1.total === 11 && full1.max_total === 11 && !!(fullF && fullF.graded_at),
+  check('fully-auto total 5/5 + graded_at set',
+    full1 && full1.total === 5 && full1.max_total === 5 && !!(fullF && fullF.graded_at),
     JSON.stringify(full1 && { t: full1.total, m: full1.max_total, g: fullF && fullF.graded_at }));
   const finFull = await req('POST', '/api/submissions/' + full1.id + '/finalize', {}, admin.token);
   check('admin finalizes fully-auto result directly -> final',
     finFull.json && finFull.json.submission && finFull.json.submission.status === 'final');
-  // Wrong answers (E2E-003, qurban): FIB wrong -> 0, theory no keywords -> 0.
+  // Theory-routes submission (E2E-004, pawan): MCQ + FIB are auto-gradable
+  // but the theory question (with stored key words) forces teacher routing.
+  const thSub = await req('POST', '/api/submissions', {
+    client_id: 'e2e-ag4-' + Date.now(),
+    student: { roll_number: 'E2E-004' }, test_id: autoCId,
+    answers: [
+      { q: 0, answer: 0 },
+      { q: 1, answer: 'Karachi' },
+      { q: 2, answer: 'Evaporation lifts water up, condensation forms clouds, precipitation falls as rain.' },
+    ],
+  });
+  const th1 = thSub.json && thSub.json.submission;
+  const thFull = th1 ? await req('GET', '/api/submissions/' + th1.id, null, admin.token) : null;
+  const thF = thFull && thFull.json && thFull.json.submission;
+  check('theory question routes to teacher even with stored key words (submitted, v1.10.1)',
+    th1 && th1.status === 'submitted', JSON.stringify(th1 && th1.status));
+  check('theory-routes: FIB auto 3, theory NOT auto (no auto_marks[2]), total 5',
+    thF && thF.auto_marks && thF.auto_marks['1'] === 3 && thF.auto_marks['2'] === undefined &&
+    th1 && th1.total === 5, JSON.stringify(thF && { am: thF.auto_marks, t: th1 && th1.total }));
+  // Wrong answers (E2E-003, qurban): FIB wrong -> 0, theory never auto (no auto mark).
   const wrongSub = await req('POST', '/api/submissions', {
     client_id: 'e2e-ag3-' + Date.now(),
     student: { roll_number: 'E2E-003' }, test_id: autoAId,
@@ -963,8 +1008,8 @@ async function main() {
   const wrongF = wrongFull && wrongFull.json && wrongFull.json.submission;
   check('FIB auto wrong -> 0',
     wrongF && wrongF.auto_marks && wrongF.auto_marks['1'] === 0, JSON.stringify(wrongF && wrongF.auto_marks));
-  check('theory keyword none -> 0',
-    wrongF && wrongF.auto_marks && wrongF.auto_marks['3'] === 0, JSON.stringify(wrongF && wrongF.auto_marks));
+  check('theory never auto-graded (no auto_marks[3] even with stored key words)',
+    wrongF && wrongF.auto_marks && wrongF.auto_marks['3'] === undefined, JSON.stringify(wrongF && wrongF.auto_marks));
   check('wrong-answer mixed submission still routes to teacher (submitted, total 0)',
     wrong1 && wrong1.status === 'submitted' && wrong1.total === 0, JSON.stringify(wrong1 && { s: wrong1.status, t: wrong1.total }));
   // Answer keys never leak to students or into the lab pack.
@@ -973,7 +1018,7 @@ async function main() {
     anonA.text.indexOf('key_words') === -1 && anonA.text.indexOf('KEYWORD-PHOTO-SECRET') === -1 &&
     anonA.text.indexOf('Paris') === -1 && anonA.text.indexOf('MODEL-ANSWER-PHOTOSYNTHESIS-SECRET') === -1);
   const staffA = await req('GET', '/api/tests/' + autoAId, null, tokens.kelash.token);
-  check('teacher fetch includes key_words (grading aid)',
+  check('teacher fetch still returns stored key_words (ignored, not auto-graded)',
     staffA.text.indexOf('key_words') !== -1 && staffA.text.indexOf('KEYWORD-PHOTO-SECRET') !== -1);
   const packA = await req('GET', '/api/lab-pack', null, admin.token);
   check('lab-pack has NO key_words key, NO keyword values, NO model answers',
@@ -981,9 +1026,9 @@ async function main() {
     packA.text.indexOf('evaporation') === -1 && packA.text.indexOf('MODEL-ANSWER-PHOTOSYNTHESIS-SECRET') === -1 &&
     packA.text.indexOf('Paris') === -1 && packA.text.includes('DIT Auto-Grade Test'));
   // Code-level: builder + teacher + admin UI wiring.
-  check('builder has theory key_words field + FIB label no longer says not auto-graded',
-    admJs13.includes('data-field="key_words"') && admJs13.includes("key_words: ''") &&
-    !admJs13.includes('not auto-graded'));
+  check('builder has NO theory key_words field; FIB label still auto-checked; Model answer stays (v1.10.1)',
+    !admJs13.includes('data-field="key_words"') && !admJs13.includes("key_words: ''") &&
+    admJs13.includes('Correct answer (auto-checked') && admJs13.includes('data-field="model_answer"'));
   check('teacher grading renders auto marks read-only with Auto tag',
     teaJs13.includes('sub.auto_marks') && teaJs13.includes('badge-auto') && teaJs13.includes('auto-mark'));
   check('admin results show Auto tag (badge-auto in admin.js + style.css)',

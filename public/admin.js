@@ -244,7 +244,7 @@ function newFib() {
   return { type: 'fib', question: '', suggested_answer: '', max_marks: 2 };
 }
 function newTheory() {
-  return { type: 'theory', question: '', max_marks: 5, model_answer: '', key_words: '' };
+  return { type: 'theory', question: '', max_marks: 5, model_answer: '' };
 }
 function questionTypeLabel(type) {
   if (type === 'mcq') return 'MCQ';
@@ -277,13 +277,11 @@ function renderBuilderQuestions() {
         '<label>Correct answer (auto-checked — leave blank for teacher grading) ' +
         '<input type="text" data-bq="' + i + '" data-field="suggested_answer" value="' + esc(q.suggested_answer || '') + '" placeholder="e.g. Islamabad"></label>';
     } else {
-      // Theory (v1.9.0): key words make the question auto-gradable — marks
-      // come from how many key words appear in the student's answer. No key
-      // words -> the question stays teacher-graded, as before.
+      // Theory (v1.10.1): ALWAYS teacher-graded — the model answer is
+      // shown to the teacher while grading. (v1.9.0 keyword auto-grading
+      // removed by user decision; stored key words are ignored.)
       inner += '<div class="qb-row"><label>Max marks <input type="number" min="1" data-bq="' + i + '" data-field="max_marks" value="' + q.max_marks + '"></label></div>' +
-        '<label>Model answer <textarea data-bq="' + i + '" data-field="model_answer" rows="3">' + esc(q.model_answer) + '</textarea></label>' +
-        '<label>Key words, comma-separated (for auto-grading — leave blank for teacher grading) ' +
-        '<input type="text" data-bq="' + i + '" data-field="key_words" value="' + esc(q.key_words || '') + '" placeholder="e.g. photosynthesis, sunlight, chlorophyll"></label>';
+        '<label>Model answer <textarea data-bq="' + i + '" data-field="model_answer" rows="3">' + esc(q.model_answer) + '</textarea></label>';
     }
     inner += '<button class="btn btn-small btn-danger" type="button" data-bq-del="' + i + '">Remove question</button>';
     return '<div class="qb-card">' + inner + '</div>';
@@ -477,7 +475,7 @@ async function loadResultsReview() {
       '<th>MCQ</th><th>Theory / FIB</th><th>Total</th><th>Date</th><th></th></tr>';
     subs.forEach((s) => {
       const theory = Object.keys(s.theory_marks || {}).reduce((a, k) => a + (s.theory_marks[k] || 0), 0);
-      // v1.9.0: a small 'Auto' tag when any FIB/theory mark was auto-graded,
+      // v1.9.0/v1.10.1: a small 'Auto' tag when any FIB mark was auto-graded,
       // so Admin can judge the auto-grading quality at a glance.
       const autoTag = (s.auto_marks && Object.keys(s.auto_marks).length)
         ? ' <span class="badge badge-auto">Auto</span>' : '';

@@ -57,7 +57,7 @@ async function openGrading(subId) {
       (sub.locked ? ' — LOCKED (consolidated, cannot change)' : '');
     // Anti-cheat flag (v1.8.0): this banner IS the message to the teacher —
     // the submission records how many times the student left the exam page
-    // and whether the test was auto-locked on the 2nd switch.
+    // and whether the test was auto-locked on the 4th switch.
     const flagEl = $('grade-flag');
     const switches = sub.tab_switches || 0;
     if (switches > 0) {
@@ -72,7 +72,8 @@ async function openGrading(subId) {
     const answersByQ = {};
     (sub.answers || []).forEach((a) => { answersByQ[a.q] = a.answer; });
     // Theory AND fill-in-the-blank are teacher-graded — EXCEPT the ones the
-    // server auto-graded (v1.9.0: FIB with a key, theory with key words).
+    // server auto-graded (v1.9.0/v1.10.1: FIB with a key only — theory is
+    // always teacher-graded since v1.10.1).
     // Auto marks show read-only with an 'Auto' tag; the teacher grades only
     // the remaining questions. (The server also ignores any mark sent for
     // an auto-graded question, so the auto mark can never be overwritten.)
@@ -93,8 +94,7 @@ async function openGrading(subId) {
         const typeLabel = isFib ? 'Fill in the Blank' : 'Theory';
         const marksCell = isAuto
           ? '<div class="auto-mark">Marks: <strong>' + sub.auto_marks[x.i] + ' / ' + x.q.max_marks + '</strong> ' +
-            '<span class="badge badge-auto">Auto</span></div>' +
-            (!isFib && x.q.key_words ? '<p class="muted">Key words: ' + esc(x.q.key_words) + '</p>' : '')
+            '<span class="badge badge-auto">Auto</span></div>'
           : '<label style="margin-top:10px">Marks (0–' + x.q.max_marks + ') ' +
             '<input class="marks-input" type="number" min="0" max="' + x.q.max_marks + '" data-marks-for="' + x.i +
             '" value="' + saved + '"' + (sub.locked ? ' disabled' : '') + '></label>';
