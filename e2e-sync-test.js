@@ -1,6 +1,7 @@
-// STC Testing System — USB-sync verification script (v1.9.0: offline labs,
-// auto-grading via the shared server path — FIB auto-checked, theory without
-// key words still teacher-graded).
+// STC Testing System — USB-sync verification script (v1.10.0: offline labs,
+// import dedupes by (roll, test) — the first submission is kept, later
+// attempts rejected and counted; auto-grading via the shared server path —
+// FIB auto-checked, theory without key words still teacher-graded).
 // Tests the full offline-lab loop WITHOUT a browser:
 //   seed students + a monthly test via the Admin API -> export the lab pack
 //   (GET /api/lab-pack) -> build lab submissions EXACTLY in the format the
@@ -57,7 +58,7 @@ async function main() {
 
   console.log('\n[1] Health + admin login');
   const h = await req('GET', '/api/health');
-  check('health 200 + version 1.9.0', h.status === 200 && h.json && h.json.version === '1.9.0', h.json && h.json.version);
+  check('health 200 + version 1.10.0', h.status === 200 && h.json && h.json.version === '1.10.0', h.json && h.json.version);
   const admin = await login('admin', 'admin123', 'admin');
   check('admin login', !!(admin && admin.token));
   if (!admin) { console.log('FATAL: admin login failed'); process.exit(1); }
@@ -124,7 +125,7 @@ async function main() {
   //   submitted_at }, wrapped in the export envelope.
   const nowIso = new Date().toISOString();
   const envelope = {
-    format: 'stc-lab-submissions', version: '1.9.0', pack_id: packId,
+    format: 'stc-lab-submissions', version: '1.10.0', pack_id: packId,
     exported_at: nowIso,
     submissions: [
       {
@@ -153,8 +154,9 @@ async function main() {
   check('lab-import with teacher token -> 403', impTeacher.status === 403);
   const imp = await req('POST', '/api/lab-import', envelope, admin.token);
   check('lab-import 200', imp.status === 200, imp.status + ' ' + imp.text.slice(0, 200));
-  check('imported 2, duplicates 0, errors 0',
-    imp.json && imp.json.imported === 2 && imp.json.duplicates === 0 && (imp.json.errors || []).length === 0,
+  check('imported 2, duplicates 0, already_taken 0, errors 0',
+    imp.json && imp.json.imported === 2 && imp.json.duplicates === 0 && imp.json.already_taken === 0 &&
+    (imp.json.errors || []).length === 0,
     JSON.stringify(imp.json));
 
   console.log('\n[5] Imported submissions — server-side MCQ auto-grade + schema');
@@ -203,8 +205,9 @@ async function main() {
 
   console.log('\n[6] Re-import dedupes (same USB file twice is safe)');
   const imp2 = await req('POST', '/api/lab-import', envelope, admin.token);
-  check('re-import: imported 0, duplicates 2, errors 0',
-    imp2.json && imp2.json.imported === 0 && imp2.json.duplicates === 2 && (imp2.json.errors || []).length === 0,
+  check('re-import: imported 0, duplicates 2, already_taken 0, errors 0 (client_id dedupe wins)',
+    imp2.json && imp2.json.imported === 0 && imp2.json.duplicates === 2 && imp2.json.already_taken === 0 &&
+    (imp2.json.errors || []).length === 0,
     JSON.stringify(imp2.json));
   const subs2 = await req('GET', '/api/submissions?test_id=' + testId, null, admin.token);
   check('still exactly 2 submissions after re-import',
@@ -269,6 +272,47 @@ async function main() {
     check('LAB001 report total 6/12', row1.total === 6 && row1.max === 12, JSON.stringify(row1));
     check('LAB002 report total 10/12', row2.total === 10 && row2.max === 12, JSON.stringify(row2));
   }
+
+  console.log('\n[11] v1.10.0 — import dedupes by (roll, test): second-laptop attempt rejected');
+  // LAB001 and LAB002 each took the same test on a SECOND laptop (new
+  // client_ids, different answers) — the Admin PC already has their first
+  // submissions, so the second attempts are rejected and counted, not stored.
+  // (Their first submissions are now final / sent_to_admin — the block
+  // applies whatever the grading status.)
+  const dupEnvelope = {
+    format: 'stc-lab-submissions', version: '1.10.0', pack_id: packId,
+    exported_at: nowIso,
+    submissions: [
+      {
+        client_id: 'c-sync-dup1', student: { roll_number: 'LAB001' }, test_id: testId,
+        answers: [
+          { q: 0, answer: 0 }, { q: 1, answer: 1 },
+          { q: 2, answer: 'Different' }, { q: 3, answer: 'Second attempt text.' },
+        ],
+        submitted_at: nowIso,
+      },
+      {
+        client_id: 'c-sync-dup2', student: { roll_number: 'LAB002' }, test_id: testId,
+        answers: [
+          { q: 0, answer: 0 }, { q: 1, answer: 0 },
+          { q: 2, answer: 'Different' }, { q: 3, answer: 'Second attempt text.' },
+        ],
+        submitted_at: nowIso,
+      },
+    ],
+  };
+  const impDup = await req('POST', '/api/lab-import', dupEnvelope, admin.token);
+  check('second-laptop import: imported 0, already_taken 2, duplicates 0, errors 0',
+    impDup.json && impDup.json.imported === 0 && impDup.json.already_taken === 2 &&
+    impDup.json.duplicates === 0 && (impDup.json.errors || []).length === 0,
+    JSON.stringify(impDup.json));
+  const subs3 = await req('GET', '/api/submissions?test_id=' + testId, null, admin.token);
+  const list3 = (subs3.json && subs3.json.submissions) || [];
+  check('still exactly 2 submissions after duplicate import', list3.length === 2, 'got ' + list3.length);
+  const kept1 = list3.find((s) => s.student_roll === 'LAB001');
+  check('FIRST submission kept (original client_id c-sync-001, total still 6)',
+    kept1 && kept1.client_id === 'c-sync-001' && kept1.total === 6,
+    JSON.stringify(kept1 && { c: kept1.client_id, t: kept1.total }));
 
   console.log('\n========================================');
   console.log('E2E SYNC RESULT: ' + pass + ' PASS, ' + fail + ' FAIL');

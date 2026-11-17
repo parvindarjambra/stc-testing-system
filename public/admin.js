@@ -618,7 +618,7 @@ async function importLabFiles() {
   if (!files || !files.length) { toast('Choose one or more lab submission (.json) files first.', false); return; }
   const box = $('lab-import-result');
   box.innerHTML = '<p class="muted">Importing ' + files.length + ' file(s)...</p>';
-  let totalImported = 0, totalDupes = 0;
+  let totalImported = 0, totalDupes = 0, totalAlreadyTaken = 0;
   let html = '';
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
@@ -630,8 +630,13 @@ async function importLabFiles() {
       const d = await api('/api/lab-import', { method: 'POST', body: envelope });
       totalImported += d.imported || 0;
       totalDupes += d.duplicates || 0;
+      totalAlreadyTaken += d.already_taken || 0;
       html += '<p><strong>' + esc(file.name) + ':</strong> imported ' + (d.imported || 0) +
-        ', duplicates ' + (d.duplicates || 0) + ', errors ' + ((d.errors || []).length) + '</p>';
+        ', duplicates ' + (d.duplicates || 0) +
+        // v1.10.0: a student who took the same test on two laptops is
+        // counted once — the second attempt is rejected and reported.
+        ', second attempts rejected ' + (d.already_taken || 0) +
+        ', errors ' + ((d.errors || []).length) + '</p>';
       if (d.errors && d.errors.length) {
         html += '<ul>' + d.errors.map((er) => '<li class="err">' + esc(er.error) + '</li>').join('') + '</ul>';
       }
@@ -639,9 +644,11 @@ async function importLabFiles() {
       html += '<p><strong>' + esc(file.name) + ':</strong> <span class="err">failed — ' + esc(err.message) + '</span></p>';
     }
   }
-  html = '<p><strong>Total imported:</strong> ' + totalImported + ' &nbsp; <strong>Duplicates skipped:</strong> ' + totalDupes + '</p>' + html;
+  html = '<p><strong>Total imported:</strong> ' + totalImported + ' &nbsp; <strong>Duplicates skipped:</strong> ' + totalDupes +
+    ' &nbsp; <strong>Second attempts rejected:</strong> ' + totalAlreadyTaken + '</p>' + html;
   box.innerHTML = html;
-  toast('Lab import done: ' + totalImported + ' imported, ' + totalDupes + ' duplicates.', true);
+  toast('Lab import done: ' + totalImported + ' imported, ' + totalDupes + ' duplicates' +
+    (totalAlreadyTaken ? ', ' + totalAlreadyTaken + ' second attempts rejected' : '') + '.', true);
 }
 
 /* Course-wise result sheet (print): grouped by course, institute header

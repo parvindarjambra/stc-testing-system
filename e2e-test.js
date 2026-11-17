@@ -1,10 +1,12 @@
-// STC Testing System — end-to-end verification script (v1.9.0: auto-grading
-// — FIB auto-check + theory keyword auto-grading, fully-auto submissions
-// straight to Admin, teacher flow kept as fallback; anti-cheat tab-switch
-// warning + auto-lock + teacher flag; full-width consoles, inline validation
-// errors, no student back/change; no demo hints in the UI; four-field
-// student verification, real logo, back-to-home, teacher import,
-// fill-in-the-blank, course-wise results).
+// STC Testing System — end-to-end verification script (v1.10.0: one student,
+// one attempt per test (server blocks a second start + second submit; lab
+// import dedupes by roll + test) + lab durability (draft auto-save, restore
+// on reopen); auto-grading — FIB auto-check + theory keyword auto-grading,
+// fully-auto submissions straight to Admin, teacher flow kept as fallback;
+// anti-cheat tab-switch warning + auto-lock + teacher flag; full-width
+// consoles, inline validation errors, no student back/change; no demo hints
+// in the UI; four-field student verification, real logo, back-to-home,
+// teacher import, fill-in-the-blank, course-wise results).
 // Usage: 1) wipe the test DB:  rm -f data/stc.sqlite data/*.json
 //        2) start server:      PORT=3102 node server.js   (auto-seeds users/courses on first start)
 //        3) run:               node e2e-test.js [baseUrl]
@@ -72,7 +74,7 @@ async function main() {
   const h = await req('GET', '/api/health');
   check('health 200 + ok', h.status === 200 && h.json && h.json.ok === true, JSON.stringify(h.json));
   check('db backend reported', h.json && (h.json.db === 'sqlite' || h.json.db === 'json'), h.json && h.json.db);
-  check('version is 1.9.0', h.json && h.json.version === '1.9.0', h.json && h.json.version);
+  check('version is 1.10.0', h.json && h.json.version === '1.10.0', h.json && h.json.version);
   const home = await req('GET', '/');
   check('home is the Student Terminal (institute name + verify form + heading)',
     home.status === 200 && home.text.includes('Super Sys-Tech Computers Centre') &&
@@ -767,10 +769,18 @@ async function main() {
     !css.text.includes('.btn-link'));
 
   console.log('\n[24] v1.8.0 — anti-cheat: tab-switch warning, auto-lock, teacher flag');
+  // v1.10.0: one student, one attempt — E2E-001 already submitted dit in §7,
+  // so the three flag checks need three fresh students (all DIT, kelash).
+  const acStudents = [];
+  for (const roll of ['E2E-AC1', 'E2E-AC2', 'E2E-AC3']) {
+    const r = await req('POST', '/api/students', { roll_number: roll, name: 'E2E Anti-Cheat ' + roll, father_name: 'E2E Father AC', course: 'DIT', shift: '07:00 AM - 08:00 AM', teacher_id: tokens.kelash.id }, admin.token);
+    if (r.status === 201) acStudents.push(r.json.student);
+  }
+  check('setup: 3 fresh anti-cheat students created (all 201)', acStudents.length === 3, 'created ' + acStudents.length);
   // Live: a submission WITH anti-cheat flags stores them (online submit).
   const acSub = await req('POST', '/api/submissions', {
     client_id: 'e2e-ac1-' + Date.now(),
-    student: { roll_number: 'E2E-001' },
+    student: { roll_number: 'E2E-AC1' },
     test_id: dit.id, answers, tab_switches: 2, auto_locked: true,
   });
   const ac1 = acSub.json && acSub.json.submission;
@@ -784,7 +794,7 @@ async function main() {
   // Live: a submission WITHOUT flags defaults to 0 / false.
   const plainSub = await req('POST', '/api/submissions', {
     client_id: 'e2e-ac2-' + Date.now(),
-    student: { roll_number: 'E2E-001' },
+    student: { roll_number: 'E2E-AC2' },
     test_id: dit.id, answers,
   });
   const pl1 = plainSub.json && plainSub.json.submission;
@@ -796,7 +806,7 @@ async function main() {
   // Live: forged flag values are sanitized (junk count -> 0, string lock -> false).
   const junkSub = await req('POST', '/api/submissions', {
     client_id: 'e2e-ac3-' + Date.now(),
-    student: { roll_number: 'E2E-001' },
+    student: { roll_number: 'E2E-AC3' },
     test_id: dit.id, answers, tab_switches: 'junk', auto_locked: 'yes',
   });
   const jk1 = junkSub.json && junkSub.json.submission;
@@ -978,6 +988,70 @@ async function main() {
     teaJs13.includes('sub.auto_marks') && teaJs13.includes('badge-auto') && teaJs13.includes('auto-mark'));
   check('admin results show Auto tag (badge-auto in admin.js + style.css)',
     admJs13.includes('badge-auto') && admJs13.includes('auto_marks') && css.text.includes('.badge-auto'));
+
+  console.log('\n[26] v1.10.0 — one student, one attempt per test + lab durability');
+  // A fresh student + fresh test: the full attempt lifecycle.
+  const s1100 = await req('POST', '/api/students', { roll_number: 'E2E-1100', name: 'E2E Student Eleven', father_name: 'E2E Father Eleven', course: 'DIT', shift: '07:00 AM - 08:00 AM', teacher_id: tokens.kelash.id }, admin.token);
+  check('setup: E2E-1100 student created (201)', s1100.status === 201, JSON.stringify(s1100.json));
+  const t1100 = await req('POST', '/api/tests', {
+    title: 'DIT One-Attempt Test', course: 'DIT', type: 'daily-quiz',
+    duration_minutes: 30, questions: [mcq(1, 0), mcq(2, 1)],
+  }, admin.token);
+  const t1100Id = t1100.json && t1100.json.test && t1100.json.test.id;
+  check('setup: one-attempt test created (201)', t1100.status === 201, JSON.stringify(t1100.json));
+  // Interrupted (unsubmitted) exam can restart: starting twice is fine —
+  // starting creates no submission, so nothing blocks the second start.
+  const start1 = await req('GET', '/api/tests/' + t1100Id + '?roll=E2E-1100');
+  check('first start allowed (200, no submission yet)', start1.status === 200, 'got ' + start1.status);
+  const start2 = await req('GET', '/api/tests/' + t1100Id + '?roll=E2E-1100');
+  check('second start still allowed — starting creates no submission (200)', start2.status === 200, 'got ' + start2.status);
+  const startBad = await req('GET', '/api/tests/' + t1100Id + '?roll=NOPE-999');
+  check('start with unregistered roll -> 404 roll_not_registered',
+    startBad.status === 404 && startBad.json && startBad.json.error === 'roll_not_registered', JSON.stringify(startBad.json));
+  const startNoRoll = await req('GET', '/api/tests/' + t1100Id);
+  check('fetch without roll param still works (200, no check — staff flows unchanged)',
+    startNoRoll.status === 200, 'got ' + startNoRoll.status);
+  const a1100 = [{ q: 0, answer: 0 }, { q: 1, answer: 1 }];
+  const sub1100 = await req('POST', '/api/submissions', {
+    client_id: 'e2e-1100-' + Date.now(),
+    student: { roll_number: 'E2E-1100' }, test_id: t1100Id, answers: a1100,
+  });
+  check('first submit accepted (201)', sub1100.status === 201, JSON.stringify(sub1100.json));
+  const startAfter = await req('GET', '/api/tests/' + t1100Id + '?roll=E2E-1100');
+  check('second start blocked after submit (409 already_taken + exact message)',
+    startAfter.status === 409 && startAfter.json && startAfter.json.errorCode === 'already_taken' &&
+    startAfter.json.error === 'You have already taken this test.', JSON.stringify(startAfter.json));
+  const subAgain = await req('POST', '/api/submissions', {
+    client_id: 'e2e-1100b-' + Date.now(),
+    student: { roll_number: 'E2E-1100' }, test_id: t1100Id, answers: a1100,
+  });
+  check('second submit rejected (409 already_taken, new client_id)',
+    subAgain.status === 409 && subAgain.json && subAgain.json.errorCode === 'already_taken', JSON.stringify(subAgain.json));
+  const startOther = await req('GET', '/api/tests/' + t1100Id + '?roll=E2E-001');
+  check('a different student can still start the same test (200)', startOther.status === 200, 'got ' + startOther.status);
+  const startLower = await req('GET', '/api/tests/' + t1100Id + '?roll=e2e-1100');
+  check('start check is case-insensitive (lowercase roll -> 409)',
+    startLower.status === 409, 'got ' + startLower.status);
+  const startOld = await req('GET', '/api/tests/' + dit.id + '?roll=E2E-001');
+  check('E2E-001 cannot re-start dit (submitted in §7) -> 409', startOld.status === 409, 'got ' + startOld.status);
+  // Code-level: online terminal wiring.
+  check('student.js sends roll on start + shows the exact already-taken message',
+    stuSrc.includes("?roll=' + encodeURIComponent(S.student.roll_number)") && stuSrc.includes("e.message === 'You have already taken this test.'"));
+  check('student.js handles 409 already_taken on submit (showAlreadyTaken, no queue)',
+    stuSrc.includes('already_taken') && stuSrc.includes('showAlreadyTaken'));
+  check('offline queue drops 409s instead of retrying forever',
+    stuSrc.includes('res.status === 409'));
+  // Code-level: lab app wiring.
+  check('lab app checks its own saved submissions before starting (one attempt)',
+    labSrc.includes('You have already taken this test.') && labSrc.includes('getSaved().some'));
+  check('lab app auto-saves drafts keyed by roll+test + restores them',
+    labSrc.includes('stc_lab_drafts_v1') && labSrc.includes('saveDraft()') &&
+    labSrc.includes('restoreAnswerInputs') && labSrc.includes('clearDraft'));
+  check('lab draft is cleared on submit',
+    labSrc.includes('clearDraft(S.student.roll_number, S.test.id)'));
+  // Code-level: admin import shows second attempts rejected.
+  check('admin import reports second attempts rejected (already_taken)',
+    admJs13.includes('already_taken') && admJs13.includes('second attempts rejected'));
 
   console.log('\n========================================');
   console.log('E2E RESULT: ' + pass + ' PASS, ' + fail + ' FAIL');

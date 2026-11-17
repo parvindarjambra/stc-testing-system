@@ -37,8 +37,9 @@ async function flushQueue() {
       });
       const d = await res.json().catch(() => null);
       if (res.ok && d && d.ok) { synced++; continue; }
-      if (res.status === 400 || res.status === 404) {
-        // Deterministic rejection (e.g. roll number no longer registered):
+      if (res.status === 400 || res.status === 404 || res.status === 409) {
+        // Deterministic rejection (e.g. roll number no longer registered, or
+        // v1.10.0 already-taken — the student submitted this test elsewhere):
         // retrying can never succeed, so drop it instead of queueing forever.
         continue;
       }
@@ -160,10 +161,12 @@ async function loadTestPicker() {
   }
 }
 
-/* Step 3: exam screen. Fetched WITHOUT auth so answer keys are stripped. */
+/* Step 3: exam screen. Fetched WITHOUT auth so answer keys are stripped.
+   v1.10.0: the roll number goes with the fetch — the server blocks the
+   start (409 already_taken) if this student already submitted this test. */
 async function startExam(testId) {
   try {
-    const d = await api('/api/tests/' + testId, { noAuth: true });
+    const d = await api('/api/tests/' + testId + '?roll=' + encodeURIComponent(S.student.roll_number), { noAuth: true });
     const test = d.test || d;
     if (!test || !test.questions) throw new Error('Test not found.');
     S.test = test;
@@ -179,7 +182,12 @@ async function startExam(testId) {
     startTimer(test.duration_minutes * 60);
     startAntiCheat();
     window.scrollTo(0, 0);
-  } catch (e) { toast('Could not start exam: ' + e.message, false); }
+  } catch (e) {
+    // v1.10.0: the already-taken message is shown exactly as the server
+    // wrote it (no "Could not start exam:" prefix) — the exam never opens.
+    if (e.message === 'You have already taken this test.') toast(e.message, false);
+    else toast('Could not start exam: ' + e.message, false);
+  }
 }
 
 function renderQuestions() {
@@ -374,6 +382,9 @@ async function submitExam(auto) {
       body: JSON.stringify(payload)
     });
     const d = await res.json().catch(() => null);
+    // v1.10.0: a 409 already-taken is a FINAL rejection (the student
+    // submitted this test elsewhere) — never queue it, never retry.
+    if (res.status === 409 && d && d.errorCode === 'already_taken') { showAlreadyTaken(); return; }
     if (!res.ok || !d || !d.ok) throw new Error((d && d.error) || ('Submit failed (' + res.status + ')'));
     if (S.examLocked) showLockedScreen(false);
     else showResult(d.submission, false);
@@ -385,6 +396,27 @@ async function submitExam(auto) {
     if (S.examLocked) showLockedScreen(true);
     else showResult(null, true);
   }
+}
+
+/* Already-taken screen (v1.10.0): the server rejected the submit because
+   this student already submitted this test (e.g. from another tab, or the
+   offline queue flushed after an online submit). The exam ends here — no
+   queueing, no retry. Same immediate session clear as the result screen. */
+function showAlreadyTaken() {
+  hideAcWarning();
+  $('stu-exam').classList.add('hidden');
+  $('stu-result').classList.remove('hidden');
+  $('stu-result-title').textContent = 'Already Taken';
+  $('stu-result-body').innerHTML =
+    '<p><strong>You have already taken this test.</strong></p>' +
+    '<table><tr><th>Test</th><td>' + esc(testLabel(S.test)) + '</td></tr>' +
+    '<tr><th>Student</th><td>' + esc(S.student.name) + ' (' + esc(S.student.roll_number) + ')</td></tr></table>' +
+    '<p class="muted">Each student can take a test only once. Your earlier answers are already with your teacher.</p>';
+  // Clear the session immediately so the next student starts blank.
+  sessionStorage.clear();
+  S.token = null; S.user = null;
+  S.test = null; S.answers = {}; S.student = null;
+  S.tabSwitches = 0; S.examLocked = false; S.away = false;
 }
 
 /* Locked screen (v1.8.0): shown after an auto-lock auto-submit. Same

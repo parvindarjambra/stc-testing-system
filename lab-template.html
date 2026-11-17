@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- =====================================================================
-     STC Testing System — Offline Lab App (USB sync, v1.9.0).
+     STC Testing System — Offline Lab App (USB sync, v1.10.0).
      Super Sys-Tech Computers Centre, Umerkot.
 
      SELF-CONTAINED: inline CSS + inline JS, ZERO external references,
@@ -17,6 +17,10 @@
      Students test fully offline; submissions are saved in this browser's
      localStorage. In the evening the teacher clicks "Export (Teacher)"
      and saves the JSON file to a USB stick for Admin to import.
+     v1.10.0: one student, one attempt per test (this laptop's own saved
+     submissions are checked before an exam starts); in-progress answers
+     are auto-saved as a draft, so a closed file or a crash mid-test
+     restores the same student's exam on reopen.
      ===================================================================== -->
 <html lang="en">
 <head>
@@ -262,6 +266,60 @@ function updateSavedBadge() {
   badge.classList.toggle('hidden', n === 0);
 }
 
+/* ---------------- in-progress exam drafts (localStorage) ----------------
+   v1.10.0: as the student answers, the draft (answers + exam end time +
+   tab-switch count) is auto-saved, keyed by roll number + test. If the
+   file closes or the laptop crashes mid-test, reopening and re-verifying
+   with the SAME student + test restores the draft and the exam continues
+   with the remaining time. A different student never sees another
+   student's draft (the key includes the roll number). The draft is
+   cleared on submit. The exam timer is wall-clock (endsAt), so time
+   keeps running while the file is closed — a draft whose time has run
+   out is submitted immediately on restore. */
+var DRAFT_KEY = 'stc_lab_drafts_v1';
+function draftKey(roll, testId) { return String(roll).toLowerCase() + '|' + String(testId); }
+function getDrafts() {
+  try { var v = JSON.parse(localStorage.getItem(DRAFT_KEY) || '{}'); return v && typeof v === 'object' ? v : {}; }
+  catch (e) { return {}; }
+}
+function getDraft(roll, testId) {
+  return getDrafts()[draftKey(roll, testId)] || null;
+}
+function saveDraft() {
+  if (!S.student || !S.test) return;
+  var drafts = getDrafts();
+  drafts[draftKey(S.student.roll_number, S.test.id)] = {
+    answers: S.answers, endsAt: S.endsAt, tabSwitches: S.tabSwitches,
+    updated_at: new Date().toISOString()
+  };
+  try { localStorage.setItem(DRAFT_KEY, JSON.stringify(drafts)); } catch (e) { /* storage full — the exam continues */ }
+}
+function clearDraft(roll, testId) {
+  var drafts = getDrafts();
+  var k = draftKey(roll, testId);
+  if (drafts[k]) {
+    delete drafts[k];
+    try { localStorage.setItem(DRAFT_KEY, JSON.stringify(drafts)); } catch (e) { /* ignore */ }
+  }
+}
+/* Fill the rendered question inputs from restored draft answers. */
+function restoreAnswerInputs() {
+  var box = $('exam-questions');
+  Object.keys(S.answers).forEach(function (k) {
+    var i = parseInt(k, 10);
+    var a = S.answers[k];
+    var q = S.test.questions[i];
+    if (!q) return;
+    if (q.type === 'mcq') {
+      var r = box.querySelector('input[name="q' + i + '"][value="' + a + '"]');
+      if (r) r.checked = true;
+    } else {
+      var inp = box.querySelector('[name="q' + i + '"]');
+      if (inp) inp.value = a;
+    }
+  });
+}
+
 /* ---------------- Step 1: four-field verification against the pack ----------------
    SAME matching as the server (POST /api/students/verify): Name, then
    Father's Name, then Course, then Roll Number — the first mismatch is
@@ -375,8 +433,37 @@ function startExam(testId) {
   var tests = (LAB_PACK && LAB_PACK.tests) || [];
   for (var i = 0; i < tests.length; i++) { if (String(tests[i].id) === String(testId)) { test = tests[i]; break; } }
   if (!test || !test.questions) { toast('Could not start exam: test not found.', false); return; }
+  /* v1.10.0: one student, one attempt — if this student already submitted
+     this test on THIS laptop, block. A duplicate on another laptop is
+     caught at the evening USB import, when the Admin PC sees both. */
+  var roll = String(S.student.roll_number).toLowerCase();
+  var already = getSaved().some(function (s) {
+    return String(s.test_id) === String(test.id) && s.student &&
+      String(s.student.roll_number).toLowerCase() === roll;
+  });
+  if (already) { toast('You have already taken this test.', false); return; }
+  /* v1.10.0: restore an in-progress draft for this student + test, if one
+     was saved before the file closed or crashed. A malformed draft (no
+     valid end time) is ignored and the exam starts fresh. */
+  var draft = getDraft(S.student.roll_number, test.id);
+  var restored = null;
+  if (draft && draft.answers && isFinite(Number(draft.endsAt))) {
+    var left = Math.max(0, Math.round((Number(draft.endsAt) - Date.now()) / 1000));
+    if (left <= 0) {
+      /* Time ran out while the file was closed — submit the saved answers. */
+      S.test = test;
+      S.answers = draft.answers || {};
+      S.tabSwitches = draft.tabSwitches || 0;
+      clearDraft(S.student.roll_number, test.id);
+      $('stu-tests').classList.add('hidden');
+      toast('Your exam time had run out. Your saved answers were submitted.', false);
+      submitExam(true);
+      return;
+    }
+    restored = { answers: draft.answers, left: left, tabSwitches: draft.tabSwitches || 0 };
+  }
   S.test = test;
-  S.answers = {};
+  S.answers = restored ? restored.answers : {};
   S.currentQ = 0;
   $('stu-tests').classList.add('hidden');
   $('stu-exam').classList.remove('hidden');
@@ -384,9 +471,17 @@ function startExam(testId) {
   $('exam-meta').textContent = test.course + ' — ' + (test.type === 'monthly-test' ? 'Monthly Test' : 'Daily Quiz') +
     ' — ' + test.questions.length + ' questions — ' + test.duration_minutes + ' minutes';
   renderQuestions();
+  if (restored) restoreAnswerInputs();
   renderPalette();
-  startTimer(test.duration_minutes * 60);
+  startTimer(restored ? restored.left : test.duration_minutes * 60);
   startAntiCheat();
+  /* startAntiCheat resets the switch count — restore the draft's count so
+     closing the file cannot wipe a warning. */
+  if (restored) S.tabSwitches = restored.tabSwitches;
+  /* Save the draft at start too (even with no answers yet): the end time
+     is locked in, so closing before answering cannot reset the timer. */
+  saveDraft();
+  if (restored) toast('Your previous answers were restored.', true);
   window.scrollTo(0, 0);
 }
 
@@ -415,6 +510,7 @@ function renderQuestions() {
       S.answers[i] = parseInt(r.value, 10);
       setCurrentQ(i);
       renderPalette();
+      saveDraft();   /* v1.10.0: every answer is auto-saved, so a closed file or a crash loses nothing */
     });
   });
   box.querySelectorAll('textarea').forEach(function (ta) {
@@ -425,6 +521,7 @@ function renderQuestions() {
       else delete S.answers[i];
       setCurrentQ(i);
       renderPalette();
+      saveDraft();
     });
   });
   box.querySelectorAll('.question-block input[type="text"]').forEach(function (inp) {
@@ -435,6 +532,7 @@ function renderQuestions() {
       else delete S.answers[i];
       setCurrentQ(i);
       renderPalette();
+      saveDraft();
     });
   });
   box.querySelectorAll('.question-block').forEach(function (el) {
@@ -531,6 +629,7 @@ function onExamLeave() {
   if (!S.antiCheatOn || S.examLocked || S.away || !S.test) return;
   S.away = true;
   S.tabSwitches++;
+  saveDraft();   /* v1.10.0: persist the switch count, so closing the file cannot wipe a warning */
   if (S.tabSwitches === 1) {
     $('ac-modal').classList.remove('hidden');
     $('ac-continue').focus();
@@ -581,6 +680,7 @@ function submitExam(auto) {
   var saved = getSaved();
   saved.push(payload);
   setSaved(saved);
+  clearDraft(S.student.roll_number, S.test.id);   /* v1.10.0: submitted — the draft is done */
   if (S.examLocked) showLockedScreen();
   else showSaved();
 }
@@ -651,7 +751,7 @@ function exportSubmissions() {
     '-' + pad(now.getHours()) + pad(now.getMinutes());
   var envelope = {
     format: 'stc-lab-submissions',
-    version: '1.9.0',
+    version: '1.10.0',
     pack_id: (LAB_PACK && LAB_PACK.pack_id) || null,
     exported_at: now.toISOString(),
     submissions: saved

@@ -820,3 +820,73 @@ with the same answers, and also goes straight to Admin).
 Screenshots: v190-keywords-field.png, v190-teacher-auto-readonly.png,
 v190-auto-tag.png in the project folder (not shipped in the ZIP).
 Version bumped to 1.9.0.
+
+## v1.10.0 (2026-11-16) — One student, one attempt per test + lab durability
+
+Ordered by the user (09:28 PST): a student must not be able to take the
+same test twice — including on two different laptops — and lab work must
+survive the HTML file closing or a glitch until the evening USB import.
+
+How it works:
+
+- **One attempt, online:** when a student picks a test, the terminal
+  fetches it with their roll number (GET /api/tests/:id?roll=) and the
+  server blocks the start with 409 'You have already taken this test.'
+  if that student already submitted this test — the exam never opens.
+  A second submit is rejected the same way (backstop for races: two
+  tabs, or the offline queue flushing after an online submit). The
+  block is by SUBMITTED test only — an interrupted exam that was never
+  submitted leaves no record, so it can restart. The 409 is a final
+  rejection: the terminal never queues it, and the offline queue drops
+  409s instead of retrying them forever.
+- **One attempt, lab app:** before an exam starts, the lab app checks
+  its own localStorage submissions — if this student already submitted
+  this test on THIS laptop, the start is blocked with the same message.
+- **Import dedupe:** when Admin imports USB submissions, a submission
+  whose student + test already exists in the system is rejected — the
+  FIRST submission is kept, the rest are counted as already_taken and
+  reported per file and in the totals, so Admin sees them. The existing
+  client_id dedupe (re-importing the same file) stays as well.
+- **Lab durability:** saved submissions live in localStorage and
+  already survive the file closing — verified by closing and reopening
+  the file in a real browser (submission still there; Export does NOT
+  wipe saved data — export and Clear stay separate). NEW: in-progress
+  answers auto-save as a draft (answers + exam end time + tab-switch
+  count), keyed by roll number + test. If the file closes or crashes
+  mid-test, reopening and re-verifying with the SAME student + test
+  restores the draft and the exam continues with the remaining time. A
+  different student never sees another student's draft (the key
+  includes the roll number). The draft is cleared on submit, and it is
+  saved at exam start too — even with no answers yet — so the end time
+  is locked in and closing before answering cannot reset the timer.
+
+Honest limit: two unconnected offline laptops cannot know about each
+other — a cross-laptop duplicate is caught at the evening USB import,
+not live on the laptop. The exam timer is wall-clock, so time keeps
+running while the file is closed: a draft whose time has run out is
+submitted immediately on restore. A hard crash (power cut, browser
+killed) may lose at most ~10s of the most recent writes — Chromium
+flushes localStorage on a timer (a minimal experiment: a write survived
+a SIGKILL only after a 12s wait, and always survived a graceful close).
+A normal file-close never loses anything.
+
+Tests: E2E 296 PASS, 0 FAIL (was 276; +1 in §24 — the three anti-cheat
+flag submits now use three fresh students, since E2E-001 already
+submitted dit in §7 and one-attempt blocks repeats — +19 in new §26:
+second start blocked after submit (409 + exact message), second submit
+rejected, interrupted (unsubmitted) exam can restart, unregistered roll
+-> 404, fetch without roll unchanged, different student unaffected,
+case-insensitive match, online/lab/admin UI wiring); e2e-sync-test.js
+57 PASS, 0 FAIL (was 54; +3 in new §11 — a second-laptop import with
+new client_ids is rejected as already_taken 2, the FIRST submission is
+kept; re-import still dedupes by client_id). Headless-Chromium check
+(CDP, real server, 0 JS errors, 22/22 checks): online double-attempt
+blocked live with the exact message; lab draft auto-saved, restored
+after a real browser close + reopen (MCQ + theory answers, timer still
+running), cleared on submit; Export does not wipe saved data; the saved
+submission survives close + reopen; same-laptop duplicate blocked; a
+different student starts blank (no draft leak); the real exported file
+imports and the online/lab duplicate is caught (already_taken 1).
+Screenshots: v1100-already-taken.png, v1100-draft-restored.png in the
+project folder (not shipped in the ZIP).
+Version bumped to 1.10.0.

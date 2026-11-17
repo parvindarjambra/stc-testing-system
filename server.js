@@ -23,6 +23,11 @@
 // theory auto-graded by key words (keyword matching only: no AI offline, so
 // real concept understanding is impossible). Fully auto-graded submissions
 // go straight to Admin; anything else goes to the teacher as before.
+// v1.10.0: one student, one attempt per test — the server blocks a second
+// start (GET /api/tests/:id?roll=) and a second submit (409 already_taken),
+// and the lab import dedupes by (roll, test_id) across laptops (the first
+// submission is kept, the rest are rejected and counted). Lab drafts are
+// client-side only (lab-template.html) — no server change for them.
 
 'use strict';
 
@@ -33,7 +38,7 @@ const crypto = require('crypto');
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = '0.0.0.0';
-const VERSION = '1.9.0';
+const VERSION = '1.10.0';
 const ROOT = __dirname;
 const DATA_DIR = path.join(ROOT, 'data');
 const PUBLIC_DIR = path.join(ROOT, 'public');
@@ -211,6 +216,7 @@ function sanitizeTabSwitches(v) {
   const n = parseInt(v, 10);
   return Number.isFinite(n) && n > 0 ? Math.min(n, 99) : 0;
 }
+
 function isValidMonth(s) { return typeof s === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(s); }
 function isValidDate(s) { return typeof s === 'string' && /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(s); }
 
@@ -285,6 +291,18 @@ function createApp(store) {
   function teacherName(id) {
     const u = id ? store.findOne('users', id) : null;
     return u ? u.name : '';
+  }
+
+  // One student, one attempt per test (v1.10.0): true when this roll number
+  // already has a SUBMITTED submission for this test, whatever its grading
+  // status (every submission record IS a submitted test — the status field
+  // only tracks grading progress). An interrupted exam that was never
+  // submitted leaves no record, so it can restart. Roll match is
+  // case-insensitive; the stored roll is the registered (canonical) one.
+  function hasSubmissionFor(roll, testId) {
+    const r = String(roll || '').trim().toLowerCase();
+    return !!store.findOne('submissions', (s) =>
+      String(s.student_roll || '').toLowerCase() === r && String(s.test_id) === String(testId));
   }
 
   // --- student verification (v1.6.0) --------------------------------------
@@ -752,6 +770,19 @@ function createApp(store) {
     if (method === 'GET' && seg[0] === 'api' && seg[1] === 'tests' && seg[2]) {
       const t = store.findOne('tests', seg[2]);
       if (!t) return sendJson(res, 404, { ok: false, error: 'test not found' });
+      // One attempt (v1.10.0): the student terminal fetches the test with
+      // ?roll= when starting an exam — if this student already submitted
+      // this test, block the start. Staff fetches pass no roll and are
+      // unaffected; an unregistered roll is rejected like a bad submit.
+      if (query.roll) {
+        const registered = store.findOne('students', (x) =>
+          x.roll_number.toLowerCase() === String(query.roll).trim().toLowerCase());
+        if (!registered) return sendJson(res, 404, { ok: false, error: 'roll_not_registered' });
+        if (hasSubmissionFor(registered.roll_number, t.id)) {
+          return sendJson(res, 409, { ok: false, errorCode: 'already_taken',
+            error: 'You have already taken this test.' });
+        }
+      }
       // Staff (valid token) see answers; students / anonymous never do.
       const user = userFromRequest(req);
       const staff = user && ['teacher', 'admin', 'principal'].includes(user.role);
@@ -810,6 +841,13 @@ function createApp(store) {
         x.roll_number.toLowerCase() === String(st.roll_number).trim().toLowerCase());
       if (!registered) return sendJson(res, 404, { ok: false, error: 'roll_not_registered' });
       if (!Array.isArray(b.answers)) return sendJson(res, 400, { ok: false, error: 'answers must be an array' });
+      // One attempt (v1.10.0): backstop for races (two tabs, offline queue
+      // flushing after an online submit) — a second submit for the same
+      // student + test is rejected, never stored.
+      if (hasSubmissionFor(registered.roll_number, test.id)) {
+        return sendJson(res, 409, { ok: false, errorCode: 'already_taken',
+          error: 'You have already taken this test.' });
+      }
       const g = gradeSubmission(test, b.answers);
       const sub = store.insert('submissions', Object.assign({
         id: newId(), client_id: b.client_id, student_roll: registered.roll_number,
@@ -968,12 +1006,16 @@ function createApp(store) {
     // teacher grading, send-to-admin, finalize and the monthly report
     // work unchanged.
     // Dedupe by client_id: re-importing the same USB file is safe.
+    // v1.10.0: also dedupe by (roll, test_id) — a student who took the same
+    // test on two unconnected laptops is caught here (the laptops cannot
+    // know about each other live). The FIRST submission is kept; later ones
+    // are rejected and counted as already_taken so Admin sees them.
     if (method === 'POST' && pathname === '/api/lab-import') {
       if (!requireAuth(req, res, ['admin'])) return;
       const b = await readBody(req).catch(() => null);
       const list = Array.isArray(b) ? b : (b && Array.isArray(b.submissions) ? b.submissions : null);
       if (!list) return sendJson(res, 400, { ok: false, error: 'submissions array is required' });
-      let imported = 0, duplicates = 0;
+      let imported = 0, duplicates = 0, alreadyTaken = 0;
       const errors = [];
       for (let i = 0; i < list.length; i++) {
         const item = list[i] || {};
@@ -990,6 +1032,7 @@ function createApp(store) {
           x.roll_number.toLowerCase() === String(roll).trim().toLowerCase());
         if (!registered) { errors.push({ index: i, client_id: item.client_id, error: label + ': roll_not_registered (' + roll + ')' }); continue; }
         if (!Array.isArray(item.answers)) { errors.push({ index: i, client_id: item.client_id, error: label + ': answers must be an array' }); continue; }
+        if (hasSubmissionFor(registered.roll_number, test.id)) { alreadyTaken++; continue; }
         const g = gradeSubmission(test, item.answers);
         // Date + submitted_at come from the lab record (when the student
         // actually took the test), so a Monday test counts on Monday even
@@ -1014,7 +1057,7 @@ function createApp(store) {
         }, autoGradeFields(g)));
         imported++;
       }
-      return sendJson(res, 200, { ok: true, imported, duplicates, errors });
+      return sendJson(res, 200, { ok: true, imported, duplicates, already_taken: alreadyTaken, errors });
     }
 
     // ---- monthly report ----
