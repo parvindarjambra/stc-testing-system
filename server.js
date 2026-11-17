@@ -38,6 +38,12 @@
 // (never the plain PIN) and the lab app asks for the PIN before Export
 // (Teacher) or Clear saved. Packs without a hash (pre-v1.10.2) still
 // work without a PIN.
+// v1.11.0: course-wise student feedback — after grading, Admin generates
+// a per-student proof sheet (GET /api/feedback, Admin only) for one test
+// or one month: every MCQ with right/wrong + correct answer, blanks with
+// the correct answer, theory with the student's written answer + the
+// teacher's marks, and totals. ROLL NUMBERS ONLY — the endpoint never
+// returns student names. Only FINALIZED (status 'final') results appear.
 
 'use strict';
 
@@ -48,7 +54,7 @@ const crypto = require('crypto');
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = '0.0.0.0';
-const VERSION = '1.10.2';
+const VERSION = '1.11.0';
 const ROOT = __dirname;
 const DATA_DIR = path.join(ROOT, 'data');
 const PUBLIC_DIR = path.join(ROOT, 'public');
@@ -1083,6 +1089,43 @@ function createApp(store) {
       return sendJson(res, 200, { ok: true, month, groups });
     }
 
+    // ---- student feedback (v1.11.0) ----
+    // Course-wise proof sheet for students, generated the NEXT DAY after
+    // grading: per student, every MCQ (right/wrong + correct answer),
+    // every blank (student's answer + correct answer), every theory
+    // question (student's written answer + teacher's marks), and totals.
+    // ROLL NUMBERS ONLY — the response never contains student names.
+    // Only FINALIZED (status 'final') results appear, so ungraded work
+    // can never leak into the sheet. Admin only.
+    if (method === 'GET' && pathname === '/api/feedback') {
+      if (!requireAuth(req, res, ['admin'])) return;
+      const course = typeof query.course === 'string' ? query.course.trim() : '';
+      if (!course) return sendJson(res, 400, { ok: false, error: 'course is required' });
+      const testId = typeof query.test_id === 'string' ? query.test_id.trim() : '';
+      const month = typeof query.month === 'string' ? query.month.trim() : '';
+      if (!testId && !month) {
+        return sendJson(res, 400, { ok: false, error: 'test_id or month is required' });
+      }
+      if (month && !isValidMonth(month)) {
+        return sendJson(res, 400, { ok: false, error: 'month (YYYY-MM) is required' });
+      }
+      let test = null;
+      if (testId) {
+        test = store.findOne('tests', testId);
+        if (!test) return sendJson(res, 404, { ok: false, error: 'test not found' });
+        if (test.course !== course) {
+          return sendJson(res, 400, { ok: false, error: 'test is not for that course' });
+        }
+      }
+      const students = feedbackRows(course, testId || null, month || null);
+      return sendJson(res, 200, {
+        ok: true, course,
+        test: test ? { id: test.id, title: test.title, type: test.type, month: test.month || null } : null,
+        month: month || null,
+        students,
+      });
+    }
+
     // ---- analytics ----
     if (method === 'GET' && pathname === '/api/analytics/day') {
       if (!requireAuth(req, res, ['admin', 'principal'])) return;
@@ -1447,6 +1490,93 @@ function createApp(store) {
       String(a.roll_number).localeCompare(String(b.roll_number)) ||
       String(a.test_title).localeCompare(String(b.test_title)));
     return rows;
+  }
+
+  // Per-student feedback blocks (v1.11.0) for one test (testId) or one
+  // month of monthly tests (month) within one course. Only FINALIZED
+  // (status 'final') submissions — ungraded work never appears.
+  // ROLL NUMBERS ONLY: the blocks carry no student name or father name.
+  // Submissions whose test was deleted are skipped (no questions left
+  // to show). MCQ per-question marks are computed from the stored key
+  // (only the total is stored); FIB/theory marks come from the stored
+  // theory_marks (auto marks for FIB with a key, teacher marks otherwise).
+  function feedbackRows(course, testId, month) {
+    const testsById = {};
+    for (const t of store.find('tests')) testsById[t.id] = t;
+    const testIds = new Set();
+    if (testId) {
+      if (testsById[testId]) testIds.add(testId);
+    } else if (month) {
+      for (const t of store.find('tests')) {
+        if (t.course === course && t.type === 'monthly-test' && t.month === month) testIds.add(t.id);
+      }
+    }
+    if (!testIds.size) return [];
+    const subs = store.find('submissions', (s) =>
+      s.status === 'final' && s.course === course && testIds.has(s.test_id));
+    const blocks = [];
+    for (const s of subs) {
+      const test = testsById[s.test_id];
+      if (!test) continue; // test deleted — nothing to show for it
+      const byQ = {};
+      for (const a of (s.answers || [])) {
+        if (a && Number.isInteger(a.q)) byQ[a.q] = a.answer;
+      }
+      const marksOf = (i) => {
+        const m = s.theory_marks || {};
+        const v = m[i] !== undefined ? m[i] : m[String(i)];
+        return v === undefined ? 0 : (+v || 0);
+      };
+      const isAuto = (i) => {
+        const m = s.auto_marks || {};
+        return m[i] !== undefined || m[String(i)] !== undefined;
+      };
+      const questions = (test.questions || []).map((q, i) => {
+        const n = i + 1;
+        if (q.type === 'mcq') {
+          const sel = byQ[i] !== undefined && byQ[i] !== null && byQ[i] !== '' ? +byQ[i] : null;
+          const validSel = Number.isInteger(sel) && sel >= 0 && sel < (q.options || []).length ? sel : null;
+          const correct = validSel !== null && validSel === q.correct;
+          return {
+            n, type: 'mcq', question: q.question, options: q.options || [],
+            student_answer: validSel,
+            student_answer_text: validSel !== null ? q.options[validSel] : null,
+            correct_answer: q.correct,
+            correct_answer_text: (q.options || [])[q.correct] != null ? q.options[q.correct] : null,
+            correct, marks: correct ? (+q.marks || 0) : 0, max_marks: +q.marks || 0, auto: true,
+          };
+        }
+        if (q.type === 'fib') {
+          const given = byQ[i] !== undefined && byQ[i] !== null ? String(byQ[i]) : null;
+          const key = normAnswerText(q.suggested_answer);
+          const hasKey = !!key;
+          return {
+            n, type: 'fib', question: q.question,
+            student_answer: given,
+            correct_answer: hasKey ? q.suggested_answer : null,
+            correct: hasKey ? (given !== null && normAnswerText(given) === key) : null,
+            marks: marksOf(i), max_marks: +q.max_marks || 0, auto: isAuto(i),
+          };
+        }
+        // theory — always teacher-graded (v1.10.1); no correct answer shown,
+        // the teacher's marks are the verdict.
+        const given = byQ[i] !== undefined && byQ[i] !== null ? String(byQ[i]) : null;
+        return {
+          n, type: 'theory', question: q.question,
+          student_answer: given,
+          marks: marksOf(i), max_marks: +q.max_marks || 0, auto: false,
+        };
+      });
+      blocks.push({
+        roll_number: s.student_roll,
+        test_id: s.test_id, test_title: s.test_title, date: s.date,
+        questions, total: s.total, max_total: s.max_total,
+      });
+    }
+    blocks.sort((a, b) =>
+      String(a.roll_number).localeCompare(String(b.roll_number)) ||
+      String(a.test_title).localeCompare(String(b.test_title)));
+    return blocks;
   }
 
   // --- static file serving ---------------------------------------------------

@@ -26,6 +26,7 @@ function switchAdminTab(tab) {
   if (tab === 'students') { fillStudentFilters(); loadStudents(); }
   if (tab === 'tests') { fillTestBuilderSelects(); loadTests(); }
   if (tab === 'results') loadResultsReview();
+  if (tab === 'feedback') fillFeedbackFilters();
   if (tab === 'monthly') loadMonthlyReport('admin');
   if (tab === 'consolidation') loadConsolidationDays();
   if (tab === 'teachers') { fillTeacherCourseChecks(); loadTeachersAdmin(); }
@@ -668,6 +669,143 @@ async function printCourseWiseSheet() {
   } catch (e) { toast('Could not load course-wise results: ' + e.message, false); }
 }
 
+/* ----- Student Feedback (v1.11.0) -----
+   Course-wise proof sheet for students, generated the NEXT DAY after
+   grading. ROLL NUMBERS ONLY — the sheet (and the /api/feedback
+   endpoint behind it) never carries student names, so each student
+   finds their own result by roll number without identifying others.
+   Only finalized results appear. Admin prints it to PDF; the
+   management teacher posts the PDF in the course WhatsApp group. */
+function fillFeedbackFilters() {
+  $('fb-course').innerHTML = courseOptions('');
+  $('fb-month').value = '';
+  $('fb-test').innerHTML = '<option value="">-- Select test --</option>';
+  $('fb-print').classList.add('hidden');
+  hideFormError('fb-form-error');
+  $('feedback-sheet').innerHTML = '';
+  S.feedbackSheetHtml = null;
+  S.feedbackSheetTitle = null;
+}
+
+async function fillFeedbackTests() {
+  const course = $('fb-course').value;
+  const month = $('fb-month').value;
+  const sel = $('fb-test');
+  if (!course) {
+    sel.innerHTML = '<option value="">-- Select test --</option>';
+    return;
+  }
+  const params = new URLSearchParams({ course: course });
+  if (/^\d{4}-\d{2}$/.test(month)) params.set('month', month);
+  try {
+    const d = await api('/api/tests?' + params.toString());
+    let html = '<option value="">-- Select test --</option>';
+    // Whole-month mode: all monthly tests of the picked month at once.
+    if (/^\d{4}-\d{2}$/.test(month)) {
+      html += '<option value="__month__">All monthly tests — ' + esc(monthName(month)) + '</option>';
+    }
+    (d.tests || []).forEach((t) => {
+      html += '<option value="' + t.id + '">' + esc(testLabel(t)) +
+        (t.type === 'daily-quiz' ? ' (Daily Quiz)' : '') + '</option>';
+    });
+    sel.innerHTML = html;
+  } catch (e) {
+    sel.innerHTML = '<option value="">-- Select test --</option>';
+    toast('Could not load tests: ' + e.message, false);
+  }
+}
+
+async function generateFeedback() {
+  const course = $('fb-course').value;
+  const testVal = $('fb-test').value;
+  const month = $('fb-month').value;
+  hideFormError('fb-form-error');
+  if (!course) { showFormError('fb-form-error', 'Pick a course first.'); return; }
+  if (!testVal) { showFormError('fb-form-error', 'Pick a test (or "All monthly tests" for a month).'); return; }
+  const box = $('feedback-sheet');
+  box.innerHTML = '<p class="muted">Loading...</p>';
+  $('fb-print').classList.add('hidden');
+  try {
+    const params = new URLSearchParams({ course: course });
+    let title;
+    if (testVal === '__month__') {
+      params.set('month', month);
+      title = 'Student Feedback — ' + course + ' — ' + monthName(month);
+    } else {
+      params.set('test_id', testVal);
+      const t = $('fb-test').options[$('fb-test').selectedIndex];
+      title = 'Student Feedback — ' + course + ' — ' + (t ? t.text : '');
+    }
+    const d = await api('/api/feedback?' + params.toString());
+    const students = d.students || [];
+    if (!students.length) {
+      box.innerHTML = '<p>No finalized results for this selection yet.</p>';
+      S.feedbackSheetHtml = null;
+      S.feedbackSheetTitle = null;
+      return;
+    }
+    const html = feedbackSheetHtml(d);
+    box.innerHTML = html;
+    S.feedbackSheetHtml = html;
+    S.feedbackSheetTitle = title;
+    $('fb-print').classList.remove('hidden');
+  } catch (e) {
+    box.innerHTML = '<p>Could not load feedback: ' + esc(e.message) + '</p>';
+  }
+}
+
+/* One block per student, headed by ROLL NUMBER ONLY. Every MCQ shows
+   the student's answer, right/wrong, and the correct answer; every
+   blank shows the student's answer + correct answer; every theory
+   question shows the student's written answer + the teacher's marks.
+   Auto marks carry the small 'Auto' tag (existing pattern). */
+function feedbackSheetHtml(d) {
+  const students = d.students || [];
+  const head = d.test
+    ? esc(d.test.title)
+    : 'Monthly Tests — ' + esc(monthName(d.month));
+  let html = '<h4>' + esc(d.course) + ' — ' + head + ' (' + students.length +
+    ' student' + (students.length === 1 ? '' : 's') + ')</h4>';
+  students.forEach((s) => {
+    html += '<div class="fb-student"><h5>Roll No: ' + esc(s.roll_number) + '</h5>';
+    if (!d.test) html += '<p class="muted">Test: ' + esc(s.test_title) + ' &nbsp;|&nbsp; Date: ' + esc(fmtDate(s.date)) + '</p>';
+    (s.questions || []).forEach((q) => {
+      html += '<div class="fb-q"><p><strong>Q' + q.n + ' — ' +
+        (q.type === 'mcq' ? 'MCQ' : q.type === 'fib' ? 'Fill in the Blank' : 'Theory') +
+        '.</strong> ' + esc(q.question) + '</p>';
+      if (q.type === 'mcq') {
+        const verdict = q.correct
+          ? '<span class="fb-right">✓ Correct</span>'
+          : '<span class="fb-wrong">✗ Wrong</span>';
+        html += '<p>Your answer: ' + (q.student_answer_text != null ? '<strong>' + esc(q.student_answer_text) + '</strong>' : '<em>(no answer given)</em>') + ' ' + verdict + '</p>' +
+          '<p>Correct answer: ' + esc(q.correct_answer_text != null ? q.correct_answer_text : '—') + '</p>' +
+          '<p>Marks: ' + q.marks + ' / ' + q.max_marks + ' <span class="badge badge-auto">Auto</span></p>';
+      } else if (q.type === 'fib') {
+        html += '<p>Your answer: ' + (q.student_answer != null && String(q.student_answer).trim() !== '' ? '<strong>' + esc(q.student_answer) + '</strong>' : '<em>(no answer given)</em>') + '</p>';
+        if (q.correct_answer != null) {
+          const verdict = q.correct
+            ? '<span class="fb-right">✓ Correct</span>'
+            : '<span class="fb-wrong">✗ Wrong</span>';
+          html += '<p>Correct answer: ' + esc(q.correct_answer) + ' ' + verdict + '</p>';
+        }
+        html += '<p>Marks: ' + q.marks + ' / ' + q.max_marks +
+          (q.auto ? ' <span class="badge badge-auto">Auto</span>' : ' — Teacher') + '</p>';
+      } else {
+        html += '<p>Your answer: ' + (q.student_answer != null && String(q.student_answer).trim() !== '' ? esc(q.student_answer) : '<em>(no answer given)</em>') + '</p>' +
+          '<p>Marks: ' + q.marks + ' / ' + q.max_marks + ' — Teacher</p>';
+      }
+      html += '</div>';
+    });
+    html += '<p class="fb-total"><strong>Total: ' + s.total + ' / ' + s.max_total + '</strong></p></div>';
+  });
+  return html;
+}
+
+function printFeedback() {
+  if (!S.feedbackSheetHtml) return;
+  printSheet(S.feedbackSheetTitle || 'Student Feedback', S.feedbackSheetHtml);
+}
+
 function openTeacherForm(u) {
   S.editingUserId = u ? u.id : null;
   hideFormError('tc-form-error');
@@ -773,6 +911,12 @@ function initAdmin() {
     downloadCsv('/api/export/results.csv?month=' + m, 'results-' + m + '.csv');
   });
   $('mr-print-coursewise').addEventListener('click', printCourseWiseSheet);
+
+  // Student Feedback (v1.11.0)
+  $('fb-course').addEventListener('change', fillFeedbackTests);
+  $('fb-month').addEventListener('change', fillFeedbackTests);
+  $('fb-generate').addEventListener('click', generateFeedback);
+  $('fb-print').addEventListener('click', printFeedback);
 
   $('con-run').addEventListener('click', runConsolidation);
   $('con-export').addEventListener('click', () => {

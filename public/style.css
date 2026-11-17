@@ -450,6 +450,17 @@ tr.clickable:hover td { background: #f0fdfa; }
 
 .con-result { font-weight: 700; color: var(--emerald-dark); }
 
+/* ---------- Student Feedback sheet (v1.11.0) ---------- */
+/* One block per student, headed by ROLL NUMBER ONLY — no names. */
+.fb-student { border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; margin: 16px 0; background: #fff; }
+.fb-student h5 { margin: 0 0 4px; font-size: 17px; font-weight: 800; color: var(--navy); }
+.fb-q { border-top: 1px solid var(--line); padding: 10px 0; }
+.fb-q:first-of-type { border-top: none; }
+.fb-q p { margin: 4px 0; }
+.fb-right { color: #047857; font-weight: 700; }
+.fb-wrong { color: #b91c1c; font-weight: 700; }
+.fb-total { font-size: 16px; border-top: 2px solid var(--navy); padding-top: 10px; margin: 12px 0 0; }
+
 /* ---------- Print sheet (screen: hidden) ---------- */
 #print-area { display: none; }
 
@@ -486,6 +497,14 @@ tr.clickable:hover td { background: #f0fdfa; }
   .print-head p { margin: 2px 0; }
   .print-sign { display: flex; justify-content: space-between; margin-top: 48px; }
   .print-sign div { text-align: center; width: 30%; border-top: 1px solid #000; padding-top: 4px; }
+  /* Feedback sheet (v1.11.0): clean black-on-white, one student per page
+     where sensible — each block starts on a fresh page and single
+     questions never split across pages. */
+  #print-area .fb-student { border: 1px solid #000; page-break-before: always; break-before: page; page-break-inside: auto; }
+  #print-area .fb-student:first-of-type { page-break-before: avoid; break-before: avoid; }
+  #print-area .fb-q { page-break-inside: avoid; break-inside: avoid; }
+  #print-area .fb-right, #print-area .fb-wrong { color: #000; }
+  #print-area .fb-total { border-top-color: #000; }
 }
 
 /* ---------- Separate portal pages ---------- */

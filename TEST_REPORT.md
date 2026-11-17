@@ -891,6 +891,74 @@ Screenshots: v1100-already-taken.png, v1100-draft-restored.png in the
 project folder (not shipped in the ZIP).
 Version bumped to 1.10.0.
 
+## v1.11.0 (2026-11-16) — Course-wise student feedback PDF (roll numbers only)
+
+User order (09:28 PST, spec refined 19:47 PST): after grading, students
+get proof of their result — the NEXT DAY (not right after the test). A
+course-wise PDF showing, per student: ALL MCQs with right/wrong status
++ the correct answer for each, blanks with the student's answer +
+correct answer, theory questions with the student's written answer +
+the marks the teacher gave, and total marks. ROLL NUMBERS ONLY — no
+names, no father names — so each student finds their own result by roll
+number without identifying others. The management teacher posts the PDF
+in the course WhatsApp group; the system only GENERATES it (no
+distribution feature). This supersedes the old 'no result cards' rule —
+the user explicitly ordered it.
+
+How it works: new Admin console tab 'Student Feedback' (between
+Results and Monthly Reports). Admin picks a course, then a test (or a
+month, which lists only that month's monthly tests plus an 'All monthly
+tests' whole-month option), and clicks 'Generate Feedback Sheet'. The
+sheet renders one block per student, headed by ROLL NUMBER ONLY
+('Roll No: 1001'): each MCQ (question, student's answer, ✓ Correct /
+✗ Wrong, correct answer, marks with the small 'Auto' tag), each blank
+(question, student's answer, correct answer, marks — 'Auto' tag when
+auto-graded, '— Teacher' when teacher-graded), each theory question
+(question, student's written answer, teacher's marks), and the total.
+Marks shown are the FINAL marks (auto for MCQ/FIB + teacher for
+theory). A 'Print / Save as PDF' button prints the sheet via the
+existing printSheet pattern (browser print-to-PDF, no PDF library,
+zero npm deps). Print CSS is clean black-on-white: each student block
+starts on a fresh page, single questions never split across pages, and
+the sidebar/nav/buttons are hidden in print.
+
+Server: new Admin-only endpoint GET /api/feedback?course=&test_id=
+(or month=). It reuses the existing submission/grading data — no new
+storage. Only FINALIZED submissions (status 'final') appear, so
+ungraded work can never leak into the sheet; if nothing is finalized
+for the selection, the sheet says 'No finalized results for this
+selection yet.' The endpoint NEVER returns student names (the response
+carries roll_number only) — verified by grep + a test that scans the
+raw JSON for student/father names. MCQ per-question marks are computed
+from the stored key (only the total is stored); FIB/theory marks come
+from the stored theory_marks. Submissions whose test was deleted are
+skipped. Validation: 400 without a course, without test_id/month, with
+a bad month, or when the test belongs to another course; 404 for an
+unknown test; 403 for teacher/principal (Admin only), 401 anonymous.
+
+Tests: E2E 334 PASS, 0 FAIL (was 309; +25 in new §28 — endpoint
+returns roll numbers only (raw JSON scanned for names), only finalized
+results included, MCQ right/wrong + correct answers present, theory
+text + teacher marks present, FIB auto vs teacher-graded, month mode,
+empty selection, validation 400/404, teacher/principal 403, anonymous
+401, Admin console UI + sheet builder + print CSS). e2e-sync-test.js
+62 PASS, 0 FAIL (unchanged — the lab loop is untouched).
+Headless-Chromium check (CDP, real server, 0 JS errors, 20/20 checks):
+Feedback tab + selectors + Generate + Print present, roll-numbers-only
++ next-day wording, inline error with no course/test, course lists the
+tests, month filter + 'All monthly tests' option, whole-month sheet
+shows the finalized block and excludes the unfinalized student,
+single-test sheet (one block, roll only, no names, ✓/✗, correct
+answers, FIB + Auto tag, theory text + teacher marks 4/5, total 9/12),
+Print fills #print-area and calls window.print(), print view hides
+nav/buttons (verified with emulated print media), empty state message
++ Print hidden. Lab smoke of the real exported STC-Lab.html (file://,
+0 JS errors, 12/12 checks) — regression only, the lab app is
+unchanged.
+Screenshots: v1110-feedback-section.png, v1110-feedback-sheet.png in
+the project folder (not shipped in the ZIP).
+Version bumped to 1.11.0.
+
 ## v1.10.2 (2026-11-16) — Lab teacher PIN (students get no permissions)
 
 User order (19:48 PST): students must get no permissions — in the lab

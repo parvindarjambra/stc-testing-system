@@ -13,6 +13,7 @@
     <button class="tab" type="button" data-tab="students"><span class="tab-icon" aria-hidden="true">👥</span>Students</button>
     <button class="tab" type="button" data-tab="tests"><span class="tab-icon" aria-hidden="true">📝</span>Tests</button>
     <button class="tab" type="button" data-tab="results"><span class="tab-icon" aria-hidden="true">✅</span>Results</button>
+    <button class="tab" type="button" data-tab="feedback"><span class="tab-icon" aria-hidden="true">📄</span>Student Feedback</button>
     <button class="tab" type="button" data-tab="monthly"><span class="tab-icon" aria-hidden="true">📅</span>Monthly Reports</button>
     <button class="tab" type="button" data-tab="consolidation"><span class="tab-icon" aria-hidden="true">🗂️</span>Day Consolidation</button>
     <button class="tab" type="button" data-tab="labsync"><span class="tab-icon" aria-hidden="true">💾</span>USB Lab Sync</button>
@@ -156,6 +157,24 @@
         </div>
         <p class="muted">Export downloads all results for the month of the selected date, grouped by course.</p>
         <div id="results-list" class="table-wrap"></div>
+      </div>
+    </div>
+
+    <!-- Student Feedback (course-wise proof PDF, roll numbers only) -->
+    <div id="tab-feedback" class="tab-panel hidden">
+      <div class="card">
+        <h3>Student Feedback — Course-wise Result PDF</h3>
+        <p class="muted">After grading, each student gets proof of their result — the next day, not right after the test. The sheet shows <strong>roll numbers only (no names)</strong>, so every student finds their own result without identifying others. Print it to PDF and the management teacher posts it in the course WhatsApp group. Only finalized results appear.</p>
+        <div class="filters">
+          <label>Course <select id="fb-course"></select></label>
+          <label>Month <input id="fb-month" type="month"></label>
+          <label>Test <select id="fb-test"><option value="">-- Select test --</option></select></label>
+          <button class="btn btn-primary" type="button" id="fb-generate">Generate Feedback Sheet</button>
+          <button class="btn hidden" type="button" id="fb-print">Print / Save as PDF</button>
+        </div>
+        <p class="muted">Pick a month to list only that month's monthly tests — or choose "All monthly tests" to cover the whole month at once.</p>
+        <p id="fb-form-error" class="form-error hidden"></p>
+        <div id="feedback-sheet" class="table-wrap"></div>
       </div>
     </div>
 

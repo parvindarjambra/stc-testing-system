@@ -1,6 +1,8 @@
-// STC Testing System — end-to-end verification script (v1.10.2: lab
-// teacher PIN — pack export requires a PIN, only its SHA-256 hash is
-// embedded, the lab app asks for the PIN before Export / Clear saved;
+// STC Testing System — end-to-end verification script (v1.11.0: course-wise
+// student feedback PDF — roll numbers only, finalized results only;
+// v1.10.2: lab teacher PIN — pack export requires a PIN, only its
+// SHA-256 hash is embedded, the lab app asks for the PIN before Export /
+// Clear saved;
 // v1.10.1: three anti-cheat warnings before auto-lock (lock on the 4th
 // switch); theory marking back to the teacher — MCQ + FIB auto-graded,
 // theory ALWAYS teacher-graded (stored key words ignored); v1.10.0: one
@@ -80,7 +82,7 @@ async function main() {
   const h = await req('GET', '/api/health');
   check('health 200 + ok', h.status === 200 && h.json && h.json.ok === true, JSON.stringify(h.json));
   check('db backend reported', h.json && (h.json.db === 'sqlite' || h.json.db === 'json'), h.json && h.json.db);
-  check('version is 1.10.2', h.json && h.json.version === '1.10.2', h.json && h.json.version);
+  check('version is 1.11.0', h.json && h.json.version === '1.11.0', h.json && h.json.version);
   const home = await req('GET', '/');
   check('home is the Student Terminal (institute name + verify form + heading)',
     home.status === 200 && home.text.includes('Super Sys-Tech Computers Centre') &&
@@ -1130,6 +1132,111 @@ async function main() {
     labSrc.includes('sha256Hex(entered) === LAB_PACK.pin_hash'));
   check('lab app works without a PIN when the pack has no hash (old packs)',
     labSrc.includes('!LAB_PACK.pin_hash'));
+
+  console.log('\n[28] v1.11.0 — course-wise student feedback: roll numbers only, finalized only');
+  // DIT monthly test (dit): E2E-001 FINALIZED 40/50 (8 MCQ right, 2 wrong;
+  // theory graded 8+7+9). E2E-003 submitted the same test but was never
+  // graded/sent — it must NOT appear (only finalized results).
+  const fbDit = await req('GET', '/api/feedback?course=DIT&test_id=' + dit.id, null, admin.token);
+  check('feedback for DIT monthly test -> 200 + course/test echo',
+    fbDit.status === 200 && fbDit.json && fbDit.json.course === 'DIT' &&
+    fbDit.json.test && fbDit.json.test.id === dit.id, 'got ' + fbDit.status);
+  const fbDitBlock = fbDit.json && (fbDit.json.students || []).find((s) => s.roll_number === 'E2E-001');
+  check('feedback includes the FINALIZED E2E-001 block (roll number only)',
+    !!fbDitBlock, JSON.stringify(fbDit.json && fbDit.json.students));
+  check('feedback JSON contains NO student names or father names (privacy)',
+    fbDit.text && !fbDit.text.includes('E2E Student') && !fbDit.text.includes('E2E Father') &&
+    !fbDit.text.includes('student_name') && !fbDit.text.includes('father_name'),
+    'names leaked into the feedback response');
+  check('only finalized: E2E-003 (submitted, never graded) NOT in the sheet',
+    fbDit.json && !(fbDit.json.students || []).some((s) => s.roll_number === 'E2E-003'));
+  check('MCQ right: Q1 correct=true, 2/2, student + correct answer shown',
+    fbDitBlock && fbDitBlock.questions[0].correct === true &&
+    fbDitBlock.questions[0].marks === 2 && fbDitBlock.questions[0].max_marks === 2 &&
+    fbDitBlock.questions[0].student_answer_text === 'Option A' &&
+    fbDitBlock.questions[0].correct_answer_text === 'Option A',
+    JSON.stringify(fbDitBlock && fbDitBlock.questions[0]));
+  check('MCQ wrong: Q9 correct=false, 0/2, wrong answer + correct answer shown',
+    fbDitBlock && fbDitBlock.questions[8].correct === false &&
+    fbDitBlock.questions[8].marks === 0 && fbDitBlock.questions[8].max_marks === 2 &&
+    fbDitBlock.questions[8].student_answer_text === 'Option B' &&
+    fbDitBlock.questions[8].correct_answer_text === 'Option A',
+    JSON.stringify(fbDitBlock && fbDitBlock.questions[8]));
+  check('theory: Q11 written answer + teacher marks 8/10, not auto',
+    fbDitBlock && fbDitBlock.questions[10].student_answer === 'Sample theory answer 1' &&
+    fbDitBlock.questions[10].marks === 8 && fbDitBlock.questions[10].max_marks === 10 &&
+    fbDitBlock.questions[10].auto === false,
+    JSON.stringify(fbDitBlock && fbDitBlock.questions[10]));
+  check('total 40/50 for the finalized dit block',
+    fbDitBlock && fbDitBlock.total === 40 && fbDitBlock.max_total === 50,
+    fbDitBlock && (fbDitBlock.total + '/' + fbDitBlock.max_total));
+  // Mixed test (autoA, DIT daily-quiz): E2E-001 FINAL 12/20 — MCQ 2,
+  // FIB auto 3 (Paris), FIB no-key teacher 2, theory 0 + 5.
+  const fbMix = await req('GET', '/api/feedback?course=DIT&test_id=' + autoAId, null, admin.token);
+  const fbMixBlock = fbMix.json && (fbMix.json.students || []).find((s) => s.roll_number === 'E2E-001');
+  check('mixed: FIB auto (Paris) correct 3/3 Auto; FIB no-key teacher 2/2, no correct answer',
+    fbMixBlock && fbMixBlock.questions[1].correct === true &&
+    fbMixBlock.questions[1].marks === 3 && fbMixBlock.questions[1].auto === true &&
+    fbMixBlock.questions[1].correct_answer === 'Paris' &&
+    fbMixBlock.questions[2].correct_answer === null &&
+    fbMixBlock.questions[2].marks === 2 && fbMixBlock.questions[2].auto === false,
+    JSON.stringify(fbMixBlock && fbMixBlock.questions.slice(1, 3)));
+  check('mixed: theory Q4 teacher 0/8 + written answer, Q5 5/5, total 12/20',
+    fbMixBlock && fbMixBlock.questions[3].student_answer === 'Plants use sunlight and chlorophyll to make food.' &&
+    fbMixBlock.questions[3].marks === 0 && fbMixBlock.questions[3].max_marks === 8 &&
+    fbMixBlock.questions[4].marks === 5 && fbMixBlock.total === 12 && fbMixBlock.max_total === 20,
+    JSON.stringify(fbMixBlock && { q3: fbMixBlock.questions[3], q4: fbMixBlock.questions[4], t: fbMixBlock.total }));
+  check('mixed: E2E-003 wrong-answers submission (never graded) NOT in the sheet',
+    fbMix.json && !(fbMix.json.students || []).some((s) => s.roll_number === 'E2E-003'));
+  // Fully-auto test (autoB, CIT daily-quiz): E2E-002 FINAL 5/5.
+  const fbFull = await req('GET', '/api/feedback?course=CIT&test_id=' + autoBId, null, admin.token);
+  const fbFullBlock = fbFull.json && (fbFull.json.students || []).find((s) => s.roll_number === 'E2E-002');
+  check('fully-auto: E2E-002 block, total 5/5',
+    fbFullBlock && fbFullBlock.total === 5 && fbFullBlock.max_total === 5,
+    JSON.stringify(fbFull.json && fbFull.json.students));
+  // Month mode: DIT 2026-11 covers only the monthly test (dit) — the
+  // daily-quiz autoA is excluded, so exactly one finalized block.
+  const fbMonth = await req('GET', '/api/feedback?course=DIT&month=2026-11', null, admin.token);
+  check('month mode: DIT 2026-11 returns only the finalized dit block',
+    fbMonth.status === 200 && fbMonth.json && (fbMonth.json.students || []).length === 1 &&
+    fbMonth.json.students[0].roll_number === 'E2E-001',
+    JSON.stringify(fbMonth.json && fbMonth.json.students));
+  const fbEmpty = await req('GET', '/api/feedback?course=DIT&month=2026-12', null, admin.token);
+  check('empty selection: DIT 2026-12 (no finalized results) -> empty students list',
+    fbEmpty.status === 200 && fbEmpty.json && Array.isArray(fbEmpty.json.students) &&
+    fbEmpty.json.students.length === 0, JSON.stringify(fbEmpty.json));
+  // Validation.
+  const fbNoCourse = await req('GET', '/api/feedback?test_id=' + dit.id, null, admin.token);
+  check('feedback without course -> 400', fbNoCourse.status === 400, 'got ' + fbNoCourse.status);
+  const fbNoSel = await req('GET', '/api/feedback?course=DIT', null, admin.token);
+  check('feedback without test_id or month -> 400', fbNoSel.status === 400, 'got ' + fbNoSel.status);
+  const fbBadMonth = await req('GET', '/api/feedback?course=DIT&month=2026-13', null, admin.token);
+  check('feedback with bad month -> 400', fbBadMonth.status === 400, 'got ' + fbBadMonth.status);
+  const fbNoTest = await req('GET', '/api/feedback?course=DIT&test_id=no-such-test', null, admin.token);
+  check('feedback with unknown test -> 404', fbNoTest.status === 404, 'got ' + fbNoTest.status);
+  const fbWrongCourse = await req('GET', '/api/feedback?course=DIT&test_id=' + autoBId, null, admin.token);
+  check('feedback for a test of another course (CIT test + course=DIT) -> 400',
+    fbWrongCourse.status === 400, 'got ' + fbWrongCourse.status);
+  // Roles: Admin only.
+  const fbTeacher = await req('GET', '/api/feedback?course=DIT&test_id=' + dit.id, null, tokens.kelash.token);
+  check('feedback as teacher -> 403', fbTeacher.status === 403, 'got ' + fbTeacher.status);
+  const fbPrincipal = await req('GET', '/api/feedback?course=DIT&test_id=' + dit.id, null, principal.token);
+  check('feedback as principal -> 403 (Admin only)', fbPrincipal.status === 403, 'got ' + fbPrincipal.status);
+  const fbAnon = await req('GET', '/api/feedback?course=DIT&test_id=' + dit.id);
+  check('feedback without login -> 401', fbAnon.status === 401, 'got ' + fbAnon.status);
+  // Code-level: Admin console UI + sheet builder + print rules.
+  check('admin console has the Student Feedback tab + course/month/test selectors + Generate + Print',
+    admFrag.includes('data-tab="feedback"') && admFrag.includes('id="tab-feedback"') &&
+    admFrag.includes('id="fb-course"') && admFrag.includes('id="fb-month"') &&
+    admFrag.includes('id="fb-test"') && admFrag.includes('id="fb-generate"') &&
+    admFrag.includes('id="fb-print"'));
+  check('admin.js builds the sheet (roll-number-only blocks, MCQ right/wrong, empty message)',
+    admJs13.includes('feedbackSheetHtml') && admJs13.includes('Roll No:') &&
+    admJs13.includes('No finalized results for this selection yet.') &&
+    admJs13.includes('Correct answer:') && admJs13.includes('/api/feedback?'));
+  check('print CSS: one student per page + questions never split (page-break rules)',
+    css.text.includes('.fb-student') && css.text.includes('page-break-before: always') &&
+    css.text.includes('.fb-q') && css.text.includes('page-break-inside: avoid'));
 
   console.log('\n========================================');
   console.log('E2E RESULT: ' + pass + ' PASS, ' + fail + ' FAIL');
